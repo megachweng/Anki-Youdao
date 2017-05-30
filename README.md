@@ -1,7 +1,7 @@
 # Anki-Youdao
 Sync your Youdao worldlist to Anki.
 
-![](https://ws4.sinaimg.cn/large/006tNc79gy1fg3rq9lgomj31io0o8kjl.jpg)
+![](http://i.imgur.com/M2tfvf0.jpg)
 # Require
 * Python 2.7
 * Python modules
@@ -16,8 +16,8 @@ Sync your Youdao worldlist to Anki.
 * Navigate to ```Anki```->```Tools```->```Import your youdao-wordlist```.
 * Change the ```Server Address``` to ```http://127.0.0.1:5000``` and type the Deck name you want to sync to.
 * Press Sync button
-* Done~
-![](https://ws4.sinaimg.cn/large/006tNc79gy1fg3ru3etdmg30k00cikjr.gif)
+* Done~  
+
 
 # Notice
 * The ServerSide.py will gernerate cookie and cached file please do not delete or modify them Unless your want to reinitialize.  
