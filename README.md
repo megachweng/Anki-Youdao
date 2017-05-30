@@ -10,6 +10,7 @@ Sync your Youdao worldlist to Anki.
 * * requests
 
 # Usage
+* Install essential module ```pip install flask lxml requests```
 * Move Youdao-wordlist to Anki add-on folder and restart Anki.
 * Open up ```serverSide.py``` with your favorite edit and change the proper ```Username ``` and ```Password``` at the very end of this file.
 * Open up terminal cd to the serverSide.py folder, than run ```python serverside.py```.
