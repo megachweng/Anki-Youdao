@@ -6,6 +6,9 @@ import os
 import urllib
 import urllib2
 import cookielib
+import sqlite3
+import pickle
+import time
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -64,9 +67,9 @@ class session(object):
         response = self.opener.open('https://logindict.youdao.com/login/acc/login', login_data)
         if response.headers.get('Set-Cookie').find(self.username) > -1:
             self.cj.save(self.cookie_filename, ignore_discard=True, ignore_expires=True)
-            return True
+            print True
         else:
-            return False
+            print False
 
     def crawler(self, pageIndex):
         response = self.opener.open(
@@ -105,15 +108,51 @@ class YoudaoParser(HTMLParser):
                     else:
                         self.definitions.append(None)
 
+    def echo(self):
+        data = {'deleted': [None], 'terms': []}
+
+        for index, value in enumerate(self.terms):
+            data['terms'].append({'term': value, 'definition': self.definitions[index]})
+
+        self.savePreviews(self.terms, self.definitions)
+        return data
+
+    def savePreviews(self, terms, definitions):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'create table if not exists history (id INTEGER primary key, terms TEXT,definitions TEXT,time varchar(20))')
+        cursor.execute('insert into history (terms,definitions,time) values (?,?,?)',
+                       (pickle.dumps(terms), (pickle.dumps(definitions)), time.strftime("%Y-%m-%d")))
+        cursor.rowcount
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+    def retrivePrevious(self):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute('select * from history order by id desc limit 0, 1')
+        values = cursor.fetchall()
+        # values[number of raw][0->id,1->terms,2->definitions,3->time]
+        terms = pickle.loads(values[0][1])
+        definitions = pickle.loads(values[0][2])
+        cursor.close()
+        conn.close()
+        return [terms, definitions]
+
 
 # ################main
-sessioned = session('username', 'password')
 parser = YoudaoParser()
+sessioned = session('username', 'password')
+sessioned.loginToYoudao()
 totalPage = sessioned.totalPage()
 
 for index in range(0, totalPage):
+    # trigger progressBar everysingle time
+    print index
     parser.feed(sessioned.crawler(index))
 
-print len(parser.terms)
-print parser.terms
-print parser.definitions
+parser.echo()
+
+parser.retrivePrevious()
