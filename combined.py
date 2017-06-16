@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from HTMLParser import HTMLParser
-import sy
+import sys
 import re
 import os
 import urllib
@@ -20,7 +20,7 @@ class SmartRedirectHandler(urllib2.HTTPRedirectHandler):
         return result
 
 
-class youdao(object):
+class session(object):
 
     def __init__(self, username, password):
         self.cookie_filename = 'youdao_cookie'
@@ -77,8 +77,8 @@ class youdao(object):
         # page index start from 0 end at max-1
         response = self.opener.open("http://dict.youdao.com/wordbook/wordlist?p=0&tags=")
         source = response.read()
-        return re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>',
-                         source, re.M | re.I).group(1)
+        return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>',
+                             source, re.M | re.I).group(1)) - 1
 
 
 # #############################################
@@ -107,9 +107,13 @@ class YoudaoParser(HTMLParser):
 
 
 # ################main
-login = youdao('Username', 'Password')
+sessioned = session('username', 'password')
 parser = YoudaoParser()
+totalPage = sessioned.totalPage()
 
-# open page and retrive source page
+for index in range(0, totalPage):
+    parser.feed(sessioned.crawler(index))
 
-# extract the terms and definitions
+print len(parser.terms)
+print parser.terms
+print parser.definitions
