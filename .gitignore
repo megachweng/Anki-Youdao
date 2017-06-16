@@ -6,3 +6,4 @@ test
 *.egg-info
 dist
 build
+example.html
