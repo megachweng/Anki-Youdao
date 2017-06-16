@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from HTMLParser import HTMLParser
-import sys
+import sy
+import re
 import os
 import urllib
 import urllib2
@@ -66,6 +67,20 @@ class youdao(object):
             return True
         else:
             return False
+
+    def crawler(self, pageIndex):
+        response = self.opener.open(
+            "http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
+        return response.read()
+
+    def totalPage(self):
+        # page index start from 0 end at max-1
+        response = self.opener.open("http://dict.youdao.com/wordbook/wordlist?p=0&tags=")
+        source = response.read()
+        return re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>',
+                         source, re.M | re.I).group(1)
+
+
 # #############################################
 
 # ################Parse section################
