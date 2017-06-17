@@ -1,25 +1,21 @@
 # Anki-Youdao
 Sync your Youdao worldlist to Anki.
 
-![](http://i.imgur.com/M2tfvf0.jpg)
-# Require
-* Python 2.7
-* Python modules
-* * flask
-* * lxml
-* * requests
+# Why
+Youdao is a gorgeous dictionary software, while the buildin new-word learning function is totally hard to use.
+thanks to Anki,looking new word up in youdao dictionary mark it then sync to Anki to remember is the best options for me
 
-# Usage
-* Install essential module ```pip install flask lxml requests```
+# How to use
+## Sync very first time
+![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/howtouse.gif)
+
+## Sync
+![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/sync.gif)
+
+* Download adds-on, unzip it
 * Move Youdao-wordlist to Anki add-on folder and restart Anki.
-* Open up ```serverSide.py``` with your favorite edit and change the proper ```Username ``` and ```Password``` at the very end of this file.
-* Open up terminal cd to the serverSide.py folder, than run ```python serverside.py```.
 * Navigate to ```Anki```->```Tools```->```Import your youdao-wordlist```.
-* Change the ```Server Address``` to ```http://127.0.0.1:5000``` and type the Deck name you want to sync to.
-* Press Sync button
+* Enter your Youdao username and password
+* Press Sync button, wait for a few seconds
 * Done~  
 
-
-# Notice
-* The ServerSide.py will gernerate cookie and cached file please do not delete or modify them Unless your want to reinitialize.  
-* please don not visit the server address by your browser, this opearation will screw all process up!!! Trust me~~
