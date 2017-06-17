@@ -9,8 +9,8 @@ Sync your Youdao worldlist to Anki.
 </div>
 
 # Why
-Youdao is a gorgeous dictionary software, while the buildin new-word learning function is totally hard to use.
-thanks to Anki,looking new word up in youdao dictionary mark it then sync to Anki to remember is the best options for me
+Youdao is a gorgeous dictionary software, while the buildin new-word learning function is totally hard to use.  
+thanks to Anki,looking new word up in youdao dictionary, mark it then sync to Anki to remember is the best options for me  
 
 # How to use
 * Sync very first time
