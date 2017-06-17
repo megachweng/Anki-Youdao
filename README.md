@@ -1,9 +1,10 @@
 # Anki-Youdao
 Sync your Youdao worldlist to Anki.
-> Mac ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/mac.png)
-> Linux ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/linux.png) 
-> Windows ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/windows.png)
-
+<div>
+<span><img style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/mac.png" width="283" height="118" alt="Mac"/></span>
+<span><img  style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/linux.png"  width="283" height="118" alt="linux"/></span>
+<span ><img  style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/windows.png"  width="283" height="118" alt="Mac"/></span>
+</div>
 # Why
 Youdao is a gorgeous dictionary software, while the buildin new-word learning function is totally hard to use.
 thanks to Anki,looking new word up in youdao dictionary mark it then sync to Anki to remember is the best options for me
