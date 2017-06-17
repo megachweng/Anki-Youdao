@@ -1,5 +1,6 @@
 # Anki-Youdao
 Sync your Youdao worldlist to Anki.
+[Anki Offical website](https://ankiweb.net/shared/info/884820986)
 <div>
 <span><img style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/mac.png" width="283" height="118" alt="Mac"/></span>
 <span><img  style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/linux.png"  width="283" height="118" alt="linux"/></span>
