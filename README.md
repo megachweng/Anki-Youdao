@@ -17,8 +17,8 @@ thanks to Anki,looking new word up in youdao dictionary mark it then sync to Ank
 * Sync
 ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/sync.gif)
 
-* Download adds-on, unzip it
-* Move Youdao-wordlist to Anki add-on folder and restart Anki.
+* Download adds-on zip file, unzip it or put ```884820986``` in ```Anki```->```Tools```->```Add-ons```->```Browse and Install```
+* Move Youdao-wordlist to Anki add-ons folder and restart Anki.
 * Navigate to ```Anki```->```Tools```->```Import your youdao-wordlist```.
 * Enter your Youdao ```username``` and ```password```
 * Press ```Sync button```, wait for a few seconds
