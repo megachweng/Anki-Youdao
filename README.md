@@ -1,5 +1,8 @@
 # Anki-Youdao
 Sync your Youdao worldlist to Anki.
+> Mac ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/mac.png)
+> Linux ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/linux.png) 
+> Windows ![](https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/windows.png)
 
 # Why
 Youdao is a gorgeous dictionary software, while the buildin new-word learning function is totally hard to use.
