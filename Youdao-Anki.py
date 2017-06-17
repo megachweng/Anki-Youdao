@@ -17,8 +17,6 @@ sys.setdefaultencoding('utf-8')
 from aqt import mw
 from aqt.qt import *
 from aqt.utils import showInfo, askUser
-# import all of the Qt GUI library
-
 # PyQT
 from PyQt4 import QtGui
 from PyQt4.QtGui import *
@@ -132,34 +130,38 @@ class Window(QWidget):
         self.show()  # shows the window
 
     def onCode(self):
-        if askUser('Sync Now?', self):
-            username = self.username_edit.text()
-            password = self.password_edit.text()
-            deckname = self.sync_to_lineEdit.text()
+        if self.username_edit.text() == '' or self.password_edit.text() == '':
+            self.tabwidget.setCurrentIndex(1)
+            showInfo('\n\nPlease enter your Username and Password!')
+        else:
+            if askUser('Sync Now?'):
+                username = self.username_edit.text()
+                password = self.password_edit.text()
+                deckname = self.sync_to_lineEdit.text()
 
-            self.sync_button.setEnabled(False)
-            self.sync_button.setText('Syncing......')
-            # stop the previous thread first
-            if self.thread is not None:
+                self.sync_button.setEnabled(False)
+                self.sync_button.setText('Please Wait')
+                # stop the previous thread first
+                if self.thread is not None:
+                    self.thread.terminate()
+
+                # download the data!
+                self.thread = YoudaoDownloader(self)
+                self.thread.start()
+                while not self.thread.isFinished():
+                    mw.app.processEvents()
+                    self.thread.wait(50)
+
+                # error with fetching data
+                if self.thread.error:
+                    print "Something went wrong"
+                else:
+                    self.saveSettings(username, password, deckname)
+                    result = json.loads(self.thread.results)
+                    self.syncYoudao(result)
+
                 self.thread.terminate()
-
-            # download the data!
-            self.thread = YoudaoDownloader(self)
-            self.thread.start()
-            while not self.thread.isFinished():
-                mw.app.processEvents()
-                self.thread.wait(50)
-
-            # error with fetching data
-            if self.thread.error:
-                print "Something went wrong"
-            else:
-                self.saveSettings(username, password, deckname)
-                result = json.loads(self.thread.results)
-                self.syncYoudao(result)
-
-            self.thread.terminate()
-            self.thread = None
+                self.thread = None
 
     def syncYoudao(self, result):
         name = self.sync_to_lineEdit.text()
@@ -230,6 +232,8 @@ class Window(QWidget):
     def retriveSettings(self):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
+        cursor.execute(
+            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT)')
         cursor.execute('select * from settings')
         values = cursor.fetchall()
         # values[number of raw][0->id,1->username,2->password,3->deckname]
@@ -264,9 +268,9 @@ class YoudaoDownloader(QThread):
         parser = YoudaoParser()
         if not self.login(self.window.username_edit.text(), self.window.password_edit.text()):
             self.window.loginFailed()
-            self.window.username_edit.setPlaceholderText('Login Failed!!!')
+            self.window.username_edit.setPlaceholderText(
+                'Login Failed!! Please Check Userinfo!!')
             self.window.username_edit.clear()
-            self.window.password_edit.setPlaceholderText('Double check Username and Passoword!!!')
             self.window.password_edit.clear()
         else:
             totalPage = self.totalPage()
@@ -336,8 +340,6 @@ class YoudaoParser(HTMLParser):
             'create table if not exists syncHistory (id INTEGER primary key, added TEXT,deleted TEXT,time varchar(20))')
         cursor.execute(
             'create table if not exists history (id INTEGER primary key, terms TEXT,definitions TEXT,time varchar(20))')
-        cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT)')
         cursor.rowcount
         cursor.close()
         conn.commit()
