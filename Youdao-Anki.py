@@ -216,7 +216,7 @@ class Window(QWidget):
             mw.col.fixIntegrity()
             mw.reset()
             info_delete = str(len(deleted))
-        showInfo('\nAdded\t:\t' + info_add + '\n\nDeleted\t:\t' + info_delete)
+        showInfo('\nAdded : ' + info_add + '\n\nDeleted : ' + info_delete)
 
     def saveSettings(self, username, password, deckname):
         conn = sqlite3.connect('youdao-anki.db')
