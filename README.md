@@ -27,3 +27,6 @@ thanks to Anki,looking new word up in youdao dictionary,mark it then sync to Ank
 * Press ```Sync button```, wait for a few seconds
 * Done~  
 
+#To-Do
+* Utilize the ```saveSyncHistory``` method 
+* Add a new tab,show the sync process history so users are able to restore
