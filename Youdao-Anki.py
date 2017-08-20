@@ -4,7 +4,7 @@ from HTMLParser import HTMLParser
 import sys
 import urllib
 import urllib2
-from cookielib import CookieJar
+import cookielib
 import re
 import sqlite3
 import pickle
@@ -295,7 +295,6 @@ class YoudaoDownloader(QThread):
         self.window.sync_button.setText('Sync')
 
     def login(self, username, password):
-        ## retrive crypt password from server
         response = urllib2.urlopen('http://api.megachweng.com?password=' + password)
         password = response.read()
 
@@ -317,7 +316,6 @@ class YoudaoDownloader(QThread):
         else:
             return True
 
-
     def crawler(self, pageIndex):
         response = self.opener.open(
             "http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
@@ -328,7 +326,7 @@ class YoudaoDownloader(QThread):
         response = self.opener.open("http://dict.youdao.com/wordbook/wordlist?p=0&tags=")
         source = response.read()
         try:
-            return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>',source, re.M | re.I).group(1)) - 1
+            return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>', source, re.M | re.I).group(1)) - 1
         except Exception:
             return 1
             pass
