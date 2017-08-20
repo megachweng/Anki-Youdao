@@ -295,26 +295,28 @@ class YoudaoDownloader(QThread):
         self.window.sync_button.setText('Sync')
 
     def login(self, username, password):
-        cj = CookieJar()
-        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-        login_data = urllib.urlencode({
-            'app': 'web',
-            'tp': 'urstoken',
-            'cf': '7',
-            'fr': '1',
-            'ru': 'http://dict.youdao.com',
-            'product': 'DICT',
-            'type': '1',
-            'um': 'true',
-            'username': username,
-            'password': password,
-            'savelogin': '1',
-        })
-        req = self.opener.open('https://logindict.youdao.com/login/acc/login', login_data)
-        if username in req.headers.get('Set-Cookie'):
-            return True
-        else:
+        ## retrive crypt password from server
+        response = urllib2.urlopen('http://api.megachweng.com?password=' + password)
+        password = response.read()
+
+        url = "https://logindict.youdao.com/login/acc/login"
+        payload = "username=" + urllib.quote(username) + "&password=" + password + \
+            "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true"
+        headers = {
+            'cache-control': "no-cache",
+            'content-type': "application/x-www-form-urlencoded"
+        }
+        url = url + '?' + payload
+        req = urllib2.Request(url, headers=headers)
+        cookie = cookielib.CookieJar()
+        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
+        self.req = urllib2.install_opener(self.opener)
+        response = urllib2.urlopen(req)
+        if "登录" in response.read():
             return False
+        else:
+            return True
+
 
     def crawler(self, pageIndex):
         response = self.opener.open(
@@ -325,8 +327,11 @@ class YoudaoDownloader(QThread):
         # page index start from 0 end at max-1
         response = self.opener.open("http://dict.youdao.com/wordbook/wordlist?p=0&tags=")
         source = response.read()
-        return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>',
-                             source, re.M | re.I).group(1)) - 1
+        try:
+            return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>',source, re.M | re.I).group(1)) - 1
+        except Exception:
+            return 1
+            pass
 
 
 class YoudaoParser(HTMLParser):
