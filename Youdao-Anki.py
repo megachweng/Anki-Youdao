@@ -9,6 +9,7 @@ import re
 import sqlite3
 import pickle
 import json
+import hashlib
 import time
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -294,9 +295,11 @@ class YoudaoDownloader(QThread):
         self.window.sync_button.setEnabled(True)
         self.window.sync_button.setText('Sync')
 
+    def hex_md5(self, password):
+        return hashlib.md5(password.encode('utf-8')).hexdigest()
+
     def login(self, username, password):
-        response = urllib2.urlopen('http://api.megachweng.com?password=' + password)
-        password = response.read()
+        password = self.hex_md5(password)
 
         url = "https://logindict.youdao.com/login/acc/login"
         payload = "username=" + urllib.quote(username) + "&password=" + password + \
