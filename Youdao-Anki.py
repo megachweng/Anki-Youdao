@@ -51,24 +51,43 @@ class Window(QWidget):
         window.password.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.password.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != ""))
-        window.username.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != ""))
+        window.deck.textEdited[str].connect(lambda: window.deck.setEnabled(window.deck.text() != ""))
+        window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.appID.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appID.text() != "" and window.appKey.text() != ""))
         window.appKey.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appKey.text() != "" and window.appID.text() != ""))
 
         window.sync.clicked.connect(self.clickSync)
         window.loginTest.clicked.connect(self.clickLoginTest)
         window.apiTest.clicked.connect(self.clikAPITest)
+        window.tabWidget.setCurrentIndex(0)
 
     def updateSettings(self, window):
-        window.username.setText("megachweng@163.com")
-        window.password.setText("cs123456")
-        window.appID.setText("3c72f9f4fdcb013a")
-        window.appKey.setText("fwrRXdnp4AmIylMTvO50GXKxm7ieRyCU")
-        window.deck.setText("Youdao")
+        settings = self.getSettingsFromDatabase()
+        if (settings):
+            window.deck.setText(settings[2])
+            window.username.setText(settings[0])
+            window.password.setText(settings[1])
+            window.fromWordbook.setChecked(settings[3])
+            if settings[4]:
+                window.apiStatus.setText("Press buttom to test API validation!")
+                window.fromYoudaoDict.setChecked(True)
+            else:
+                window.apiStatus.setText("Select 'From Youdao' radioButtom first")
+                window.fromYoudaoDict.setChecked(False)
+            window.groupBox_4.setEnabled(settings[4])
+            window.us_phonetic.setChecked(settings[5])
+            window.uk_phonetic.setChecked(settings[6])
+            window.phrase.setChecked(settings[7])
+            window.phraseExplain.setChecked(settings[8])
+
+            window.appID.setText(settings[9])
+            window.appKey.setText(settings[10])
+        else:
+            window.deck.setText("Youdao")
 
         window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != "")
         window.apiTest.setEnabled(window.appID.text() != "" and window.appKey.text() != "")
-        window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != "")
+        window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != "" and window.deck.text() != "")
 
         # go to login tab first if no username and password provided
         if self.username.text() == '' or self.password.text() == '':
@@ -84,11 +103,13 @@ class Window(QWidget):
         uk = window.uk_phonetic.isChecked() and 1 or 0
         phrase = window.phrase.isChecked() and 1 or 0
         phraseExplain = window.phraseExplain.isChecked() and 1 or 0
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain]
+        appID = window.appID.text()
+        appKey = window.appKey.text()
+        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey]
 
     def clickSync(self):
         settings = self.getSettingsFromUI(self)
-        self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8])
+        self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8], settings[9], settings[10])
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
             showInfo('\n\nPlease enter your Username and Password!')
@@ -109,15 +130,15 @@ class Window(QWidget):
         e = testPart.APItest(self.appID.text(), self.appKey.text())
         self.apiStatus.setText(errorCode.get(int(e), "Faild with errorCode: {}".format(str(e))))
 
-    def saveSettings(self, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain):
+    def saveSettings(self, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER)')
-        cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,fromWordbook,fromYoudaoDict,us,uk,phrase,phraseExplain) VALUES(?,?,?,?,?,?,?,?,?,?)',
-                       (1, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain))
-        cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,fromWordbook=?,fromYoudaoDict=?,us=?,uk=?,phrase=?,phraseExplain=? WHERE id=1',
-                       (username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain))
+            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT)')
+        cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,fromWordbook,fromYoudaoDict,us,uk,phrase,phraseExplain,appID,appKey) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (1, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey))
+        cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,fromWordbook=?,fromYoudaoDict=?,us=?,uk=?,phrase=?,phraseExplain=?,appID=?,appKey=? WHERE id=1',
+                       (username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey))
         cursor.rowcount
         conn.commit()
         conn.close()
@@ -126,25 +147,27 @@ class Window(QWidget):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER)')
+            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT)')
         cursor.execute('select * from settings')
         values = cursor.fetchall()
         if values:
             username = values[0][1]
             password = values[0][2]
             deckname = values[0][3]
-            fromWordbook = values[0][4]
-            fromYoudaoDict = values[0][5]
-            us = values[0][6]
-            uk = values[0][7]
-            phrase = values[0][8]
-            phraseExplain = values[0][9]
+            fromWordbook = ((values[0][4] == 1) and True or False)
+            fromYoudaoDict = ((values[0][5] == 1) and True or False)
+            us = ((values[0][6] == 1) and True or False)
+            uk = ((values[0][7] == 1) and True or False)
+            phrase = ((values[0][8] == 1) and True or False)
+            phraseExplain = ((values[0][9] == 1) and True or False)
+            appID = values[0][10]
+            appKey = values[0][11]
         else:
             return False
         cursor.rowcount
         conn.commit()
         conn.close()
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain]
+        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey]
 
 
 class testPart(object):
