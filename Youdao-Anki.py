@@ -103,21 +103,6 @@ class Window(QWidget):
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
 
-    def getSettingsFromUI(self, window):
-        username = window.username.text()
-        password = window.password.text()
-        deckname = window.deck.text()
-        fromWordbook = window.fromWordbook.isChecked() and 1 or 0
-        fromYoudaoDict = window.fromYoudaoDict.isChecked() and 1 or 0
-        us = window.us_phonetic.isChecked() and 1 or 0
-        uk = window.uk_phonetic.isChecked() and 1 or 0
-        phrase = window.phrase.isChecked() and 1 or 0
-        phraseExplain = window.phraseExplain.isChecked() and 1 or 0
-        appID = window.appID.text()
-        appKey = window.appKey.text()
-        fromPublicAPI = window.fromPublicAPI.isChecked() and 1 or 0
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
-
     def clickSync(self):
         settings = self.getSettingsFromUI(self)
         if settings[0] == '' or settings[1] == '':
@@ -128,13 +113,30 @@ class Window(QWidget):
         elif askUser('Sync Now?'):
             self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8], settings[9], settings[10], settings[11])
             # [0username, 1password, 2deckname, 3fromWordbook, 4fromYoudaoDict, 5us, 6uk, 7phrase, 8phraseExplain, 9appID, 10appKey,11fromPublicAPI]
+
+            # stop the previous thread first
+            if self.thread is not None:
+                self.thread.terminate()
+            # download the data!
+            self.thread = YoudaoDownloader(self)
+            self.thread.start()
+            while not self.thread.isFinished():
+                mw.app.processEvents()
+                self.thread.wait(50)
+
             if settings[3] == 1:
                 showInfo("only wordbook")
-            # elif match([[]], settings):
-            #     pass
+            elif settings[4] == 1:
+                if settings[11] == 1:
+                    showInfo("fromPublicAPI " + str(settings[5:9]))
+                else:
+                    showInfo("fromPrivateAPI " + str(settings[5:11]))
 
     def clickLoginTest(self, window):
-        self.loginStatus.setText(testPart.login(self.username.text(), self.password.text()) and "Login Successfully!" or "Login Faild!")
+        try:
+            self.loginStatus.setText(YoudaoDownloader.login(self.username.text(), self.password.text()) and "Login Successfully!" or "Login Faild!")
+        except Exception as e:
+            showInfo(str(e))
 
     def clikAPITest(self, window):
 
@@ -158,6 +160,21 @@ class Window(QWidget):
         cursor.rowcount
         conn.commit()
         conn.close()
+
+    def getSettingsFromUI(self, window):
+        username = window.username.text()
+        password = window.password.text()
+        deckname = window.deck.text()
+        fromWordbook = window.fromWordbook.isChecked() and 1 or 0
+        fromYoudaoDict = window.fromYoudaoDict.isChecked() and 1 or 0
+        us = window.us_phonetic.isChecked() and 1 or 0
+        uk = window.uk_phonetic.isChecked() and 1 or 0
+        phrase = window.phrase.isChecked() and 1 or 0
+        phraseExplain = window.phraseExplain.isChecked() and 1 or 0
+        appID = window.appID.text()
+        appKey = window.appKey.text()
+        fromPublicAPI = window.fromPublicAPI.isChecked() and 1 or 0
+        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
 
     def getSettingsFromDatabase(self):
         conn = sqlite3.connect('youdao-anki.db')
@@ -187,7 +204,165 @@ class Window(QWidget):
         return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
 
 
-class testPart(object):
+class YoudaoDownloader(QThread):
+    """thread that downloads results from the Youdao-wordlist website"""
+
+    def __init__(self, window):
+        super(YoudaoDownloader, self).__init__()
+        self.window = window
+        self.error = False
+        self.results = None
+
+    def run(self):
+        """run thread; download results!"""
+
+        # get youdao wordlist
+        parser = parseWordbook()
+        if not self.login(self.window.username.text(), self.window.password.text()):
+            # self.window.loginFailed()
+            self.window.username.setPlaceholderText('Login Failed!! Please Check Userinfo!!')
+            self.window.username.clear()
+            self.window.password.clear()
+        else:
+            totalPage = self.totalPage()
+            self.window.progress.setMaximum(totalPage)
+
+            for index in range(0, totalPage):
+                self.window.progress.setValue(index + 1)
+                # trigger progressBar everysingle time
+                parser.feed(self.crawler(index))
+
+            previous = parser.retrivePrevious()
+            if previous:
+                self.results = json.dumps(parser.compare(previous))
+            else:
+                self.results = json.dumps(parser.nocompare())
+
+            # if no results, there was an error
+            if self.results is None:
+                self.error = True
+
+        self.window.sync.setEnabled(True)
+        self.window.sync.setText('Sync')
+
+    @classmethod
+    def login(self, username, password):
+        password = hashlib.md5(password.encode('utf-8')).hexdigest()
+
+        url = "https://logindict.youdao.com/login/acc/login"
+        payload = "username=" + urllib.quote(username) + "&password=" + password + \
+            "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true"
+        headers = {
+            'cache-control': "no-cache",
+            'content-type': "application/x-www-form-urlencoded"
+        }
+        url = url + '?' + payload
+        req = urllib2.Request(url, headers=headers)
+        cookie = cookielib.CookieJar()
+        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
+        self.req = urllib2.install_opener(self.opener)
+        response = urllib2.urlopen(req)
+        if "登录" in response.read():
+            return False
+        else:
+            return True
+
+    def crawler(self, pageIndex):
+        response = self.opener.open(
+            "http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
+        return response.read()
+
+    def totalPage(self):
+        # page index start from 0 end at max-1
+        response = self.opener.open("http://dict.youdao.com/wordbook/wordlist?p=0&tags=")
+        source = response.read()
+        try:
+            return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>', source, re.M | re.I).group(1)) - 1
+        except Exception:
+            return 1
+            pass
+
+
+class parseWordbook(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.terms = []
+        self.definitions = []
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'create table if not exists syncHistory (id INTEGER primary key, added TEXT,deleted TEXT,time varchar(20))')
+        cursor.execute(
+            'create table if not exists history (id INTEGER primary key, terms TEXT,definitions TEXT,time varchar(20))')
+        cursor.rowcount
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+    def handle_starttag(self, tag, attrs):
+        # retrive the terms
+        if tag == 'div':
+            for attribute, value in attrs:
+                if value == 'word':
+                    self.terms.append(attrs[1][1])
+        # retrive the definitions
+                if value == 'desc':
+                    if attrs[1][1]:
+                        self.definitions.append(attrs[1][1])
+                    else:
+                        self.definitions.append(None)
+
+    def nocompare(self):
+        data = {'deleted': [None], 'terms': []}
+
+        for index, value in enumerate(self.terms):
+            data['terms'].append({'term': value, 'definition': self.definitions[index]})
+
+        self.savePreviews(self.terms, self.definitions)
+        self.saveSyncHistory(self.terms, self.definitions)
+        return data
+
+    def savePreviews(self, terms, definitions):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'create table if not exists history (id INTEGER primary key, terms TEXT,definitions TEXT,time varchar(20))')
+        cursor.execute('insert into history (terms,definitions,time) values (?,?,?)',
+                       (pickle.dumps(terms), (pickle.dumps(definitions)), time.strftime("%Y-%m-%d")))
+        cursor.rowcount
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+    def saveSyncHistory(self, added, deleted):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'create table if not exists syncHistory (id INTEGER primary key, added TEXT,deleted TEXT,time varchar(20))')
+        cursor.execute('insert into syncHistory (added,deleted,time) values (?,?,?)',
+                       (pickle.dumps(added), (pickle.dumps(deleted)), time.strftime("%Y-%m-%d")))
+        cursor.rowcount
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+    def retrivePrevious(self):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute('select * from history order by id desc limit 0, 1')
+        values = cursor.fetchall()
+        # values[number of raw][0->id,1->terms,2->definitions,3->time]
+        if values:
+            terms = pickle.loads(values[0][1])
+            definitions = pickle.loads(values[0][2])
+        else:
+            return False
+        cursor.close()
+        conn.close()
+        return [terms, definitions]
+
+
+class testPart(QThread):
     @classmethod
     def login(self, username, password):
         password = hashlib.md5(password.encode('utf-8')).hexdigest()
