@@ -43,6 +43,7 @@ class Window(QWidget):
         super(Window, self).__init__(parent)
         self.results = None
         self.thread = None
+
         # settings = self.retriveSettings()
         uic.loadUi("../../addons/youdao.ui", self)  # load ui from *.ui file
         self.setupUI(self)  # setupUI
@@ -104,6 +105,7 @@ class Window(QWidget):
             self.tabWidget.setCurrentIndex(1)
 
     def clickSync(self):
+        self.testOption = "no"
         settings = self.getSettingsFromUI(self)
         if settings[0] == '' or settings[1] == '':
             self.tabWidget.setCurrentIndex(1)
@@ -132,21 +134,46 @@ class Window(QWidget):
                 else:
                     showInfo("fromPrivateAPI " + str(settings[5:11]))
 
-    def clickLoginTest(self, window):
+    def clickLoginTest(self):
+        self.testOption = "login"
+        self.loginTest.setEnabled(False)
+        self.loginTest.setText("Checking..")
+
         try:
-            self.loginStatus.setText(YoudaoDownloader.login(self.username.text(), self.password.text()) and "Login Successfully!" or "Login Faild!")
+            if self.thread is not None:
+                self.thread.terminate()
+
+            self.thread = YoudaoDownloader(self)
+            self.thread.start()
+            while not self.thread.isFinished():
+                mw.app.processEvents()
+                self.thread.wait(50)
+
         except Exception as e:
             showInfo(str(e))
 
-    def clikAPITest(self, window):
-
+    def clikAPITest(self):
+        self.testOption = "API"
         errorCode = {
             0: "API Successfully!",
             108: "Application ID or Application Key invalid!",
             101: "The Application does not have a binding instance!"
         }
-        e = testPart.APItest(self.appID.text(), self.appKey.text())
-        self.apiStatus.setText(errorCode.get(int(e), "Faild with errorCode: {}".format(str(e))))
+
+        try:
+            if self.thread is not None:
+                self.thread.terminate()
+
+            self.thread = YoudaoDownloader(self)
+            self.thread.start()
+            while not self.thread.isFinished():
+                mw.app.processEvents()
+                self.thread.wait(50)
+        except Exception as e:
+            showInfo(str(e))
+        # e = testPart.APItest(self.appID.text(), self.appKey.text())
+        ec = self.thread.errorCode
+        self.apiStatus.setText(errorCode.get(int(ec), "Faild with errorCode: {}".format(str(ec))))
 
     def saveSettings(self, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI):
         conn = sqlite3.connect('youdao-anki.db')
@@ -212,40 +239,50 @@ class YoudaoDownloader(QThread):
         self.window = window
         self.error = False
         self.results = None
+        self.errorCode = 1000
 
     def run(self):
         """run thread; download results!"""
-
-        # get youdao wordlist
-        parser = parseWordbook()
-        if not self.login(self.window.username.text(), self.window.password.text()):
-            # self.window.loginFailed()
-            self.window.username.setPlaceholderText('Login Failed!! Please Check Userinfo!!')
-            self.window.username.clear()
-            self.window.password.clear()
-        else:
-            totalPage = self.totalPage()
-            self.window.progress.setMaximum(totalPage)
-
-            for index in range(0, totalPage):
-                self.window.progress.setValue(index + 1)
-                # trigger progressBar everysingle time
-                parser.feed(self.crawler(index))
-
-            previous = parser.retrivePrevious()
-            if previous:
-                self.results = json.dumps(parser.compare(previous))
+        if self.window.testOption == "login":
+            if self.login(self.window.username.text(), self.window.password.text()):
+                self.window.loginStatus.setText("Login Successfully!")
             else:
-                self.results = json.dumps(parser.nocompare())
+                self.window.loginStatus.setText("Login Failed!")
+            self.window.loginTest.setText("Check")
+            self.window.loginTest.setEnabled(True)
 
-            # if no results, there was an error
-            if self.results is None:
-                self.error = True
+        elif self.window.testOption == "API":
+            self.errorCode = self.APITest(self.window.appID.text(), self.window.appKey.text())
+        else:
+            # get youdao wordlist
+            parser = parseWordbook()
+            if not self.login(self.window.username.text(), self.window.password.text()):
+                # self.window.loginFailed()
+                self.window.username.setPlaceholderText('Login Failed!! Please Check Userinfo!!')
+                self.window.username.clear()
+                self.window.password.clear()
+            else:
+                totalPage = self.totalPage()
+                self.window.progress.setMaximum(totalPage)
 
-        self.window.sync.setEnabled(True)
-        self.window.sync.setText('Sync')
+                for index in range(0, totalPage):
+                    self.window.progress.setValue(index + 1)
+                    # trigger progressBar everysingle time
+                    parser.feed(self.crawler(index))
 
-    @classmethod
+                previous = parser.retrivePrevious()
+                if previous:
+                    self.results = json.dumps(parser.compare(previous))
+                else:
+                    self.results = json.dumps(parser.nocompare())
+
+                # if no results, there was an error
+                if self.results is None:
+                    self.error = True
+
+            self.window.sync.setEnabled(True)
+            self.window.sync.setText('Sync')
+
     def login(self, username, password):
         password = hashlib.md5(password.encode('utf-8')).hexdigest()
 
@@ -266,6 +303,25 @@ class YoudaoDownloader(QThread):
             return False
         else:
             return True
+
+    def APITest(self, appID, appKey):
+        q = "test"
+        salt = str(int(time.time()))
+        s = hashlib.md5()
+        s.update(appID + q + salt + appKey)
+        sign = s.hexdigest()
+        params = urllib.urlencode({
+            'q': q,
+            'from': "EN",
+            'to': "zh-CHS",
+            'sign': sign,
+            'salt': salt,
+            'appKey': appID
+        })
+
+        f = urllib2.urlopen('http://openapi.youdao.com/api?' + params)
+        json_result = json.loads(f.read())
+        return json_result['errorCode']
 
     def crawler(self, pageIndex):
         response = self.opener.open(
