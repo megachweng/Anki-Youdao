@@ -51,6 +51,7 @@ class Window(QWidget):
         self.show()  # shows the window
 
     def setupUI(self, window):
+        window.progressLabel.hide()
         window.setWindowTitle("Sync with Youdao Word-list")
         window.password.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
@@ -60,8 +61,9 @@ class Window(QWidget):
         window.appID.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appID.text() != "" and window.appKey.text() != ""))
         window.appKey.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appKey.text() != "" and window.appID.text() != ""))
         window.fromYoudaoDict.toggled.connect(lambda: window.cloudAPI.setEnabled((window.fromPublicAPI.isChecked() is False)))
-        window.fromWordbook.toggled.connect(lambda: window.apiStatus.setText("Select 'From Youdao' radioButtom first"))
         window.fromYoudaoDict.toggled.connect(lambda: window.apiStatus.setText("Press buttom to test API validation"))
+        window.fromYoudaoDict.toggled.connect(lambda: window.phraseExplain.setEnabled(window.phrase.isChecked()))
+        window.fromWordbook.toggled.connect(lambda: window.apiStatus.setText("Select 'From Youdao' radioButtom first"))
         window.sync.clicked.connect(self.clickSync)
         window.loginTest.clicked.connect(self.clickLoginTest)
         window.apiTest.clicked.connect(self.clikAPITest)
@@ -90,6 +92,7 @@ class Window(QWidget):
             window.uk_phonetic.setChecked(settings[6])
             window.phrase.setChecked(settings[7])
             window.phraseExplain.setChecked(settings[8])
+            window.phraseExplain.setEnabled(not settings[3])
 
             window.appID.setText(settings[9])
             window.appKey.setText(settings[10])
@@ -116,7 +119,8 @@ class Window(QWidget):
         elif askUser('Sync Now?'):
             self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8], settings[9], settings[10], settings[11])
             # [0username, 1password, 2deckname, 3fromWordbook, 4fromYoudaoDict, 5us, 6uk, 7phrase, 8phraseExplain, 9appID, 10appKey,11fromPublicAPI]
-
+            self.tabWidget.setEnabled(False)
+            self.sync.setText("Wait")
             # stop the previous thread first
             if self.thread is not None:
                 self.thread.terminate()
@@ -257,25 +261,24 @@ class YoudaoDownloader(QThread):
             # get youdao wordlist
             parser = parseWordbook(self.window)
             if not self.login(self.window.username.text(), self.window.password.text()):
-                # self.window.loginFailed()
-                self.window.username.setPlaceholderText('Login Failed!! Please Check Userinfo!!')
+                self.window.tabWidget.setCurrentIndex(1)
+                self.window.loginStatus.setText('Login Failed, Please check your account!!')
                 self.window.username.clear()
                 self.window.password.clear()
             else:
                 totalPage = self.totalPage()
                 self.window.progress.setMaximum(totalPage)
                 self.window.progress.setValue(0)
-
+                self.window.progressLabel.show()
                 for index in range(0, totalPage):
                     self.window.progress.setValue(index + 1)
                     # trigger progressBar everysingle time
                     parser.feed(self.crawler(index))
 
-                self.window.progress.setValue(0)
-
                 previous = parser.retrivePrevious()
                 if previous:
                     self.results = json.dumps(parser.compare(previous))
+                    self.window.progress.setValue(0)
 
                 else:
                     self.results = json.dumps(parser.nocompare(), indent=4)
@@ -284,8 +287,10 @@ class YoudaoDownloader(QThread):
                 if self.results is None:
                     self.error = True
 
-            self.window.sync.setEnabled(True)
+                self.window.progressLabel.setText("Done")
+
             self.window.sync.setText('Sync')
+            self.window.tabWidget.setEnabled(True)
 
     def login(self, username, password):
         password = hashlib.md5(password.encode('utf-8')).hexdigest()
@@ -391,14 +396,17 @@ class parseWordbook(HTMLParser, object):
         E:7
         '''
         self.window.progress.setMaximum(len(data['terms']))
+        self.window.progressLabel.setText("Fetching Details")
         if self.window.settings[3] == 1:
+            self.window.progress.setValue(0)
             # result = json.loads(self.thread.results)
             return data
         # get more from API
         elif self.window.settings[4] == 1:
-
+            self.window.progress.setValue(0)
             # fromPublicAPI self.window.settings[5:9]
             if self.window.settings[11] == 1:
+
                 for index, value in enumerate(data['terms']):
                     search = API.publicAPI(value['term'], self.window)
                     value["uk_phonetic"] = search["uk_phonetic"]
