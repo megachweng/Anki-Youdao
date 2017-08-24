@@ -31,8 +31,11 @@ phrase, phraseExplain
 sync_process
 
 username, password, loginTest
-appID, appKey, apiTest
+appID, appKey, apiTest,fromPublicAPI
 """
+
+
+def match(a, b): return [b[i] if x == "" else x for i, x in enumerate(a)] == b
 
 
 class Window(QWidget):
@@ -55,11 +58,14 @@ class Window(QWidget):
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.appID.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appID.text() != "" and window.appKey.text() != ""))
         window.appKey.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appKey.text() != "" and window.appID.text() != ""))
-
+        window.fromYoudaoDict.toggled.connect(lambda: window.cloudAPI.setEnabled((window.fromPublicAPI.isChecked() is False)))
+        window.fromWordbook.toggled.connect(lambda: window.apiStatus.setText("Select 'From Youdao' radioButtom first"))
+        window.fromYoudaoDict.toggled.connect(lambda: window.apiStatus.setText("Press buttom to test API validation"))
         window.sync.clicked.connect(self.clickSync)
         window.loginTest.clicked.connect(self.clickLoginTest)
         window.apiTest.clicked.connect(self.clikAPITest)
         window.tabWidget.setCurrentIndex(0)
+        window.setWindowTitle("Sync with Youdao wordbook")
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
@@ -69,12 +75,16 @@ class Window(QWidget):
             window.password.setText(settings[1])
             window.fromWordbook.setChecked(settings[3])
             if settings[4]:
-                window.apiStatus.setText("Press buttom to test API validation!")
+                window.apiStatus.setText("Press buttom to check API validation!")
                 window.fromYoudaoDict.setChecked(True)
+                window.fromPublicAPI.setEnabled(True)
+                if settings[11]:
+                    window.fromPublicAPI.setChecked(True)
+                    window.cloudAPI.setEnabled(False)
             else:
                 window.apiStatus.setText("Select 'From Youdao' radioButtom first")
                 window.fromYoudaoDict.setChecked(False)
-            window.groupBox_4.setEnabled(settings[4])
+            window.fromPublicAPI.setEnabled(settings[4])
             window.us_phonetic.setChecked(settings[5])
             window.uk_phonetic.setChecked(settings[6])
             window.phrase.setChecked(settings[7])
@@ -105,17 +115,23 @@ class Window(QWidget):
         phraseExplain = window.phraseExplain.isChecked() and 1 or 0
         appID = window.appID.text()
         appKey = window.appKey.text()
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey]
+        fromPublicAPI = window.fromPublicAPI.isChecked() and 1 or 0
+        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
 
     def clickSync(self):
         settings = self.getSettingsFromUI(self)
-        self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8], settings[9], settings[10])
-        if self.username.text() == '' or self.password.text() == '':
+        if settings[0] == '' or settings[1] == '':
             self.tabWidget.setCurrentIndex(1)
             showInfo('\n\nPlease enter your Username and Password!')
-        else:
-            if askUser('Sync Now?'):
-                pass
+        elif settings[2] == '':
+            showInfo('\n\nPlease enter Deckname!')
+        elif askUser('Sync Now?'):
+            self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8], settings[9], settings[10], settings[11])
+            # [0username, 1password, 2deckname, 3fromWordbook, 4fromYoudaoDict, 5us, 6uk, 7phrase, 8phraseExplain, 9appID, 10appKey,11fromPublicAPI]
+            if settings[3] == 1:
+                showInfo("only wordbook")
+            # elif match([[]], settings):
+            #     pass
 
     def clickLoginTest(self, window):
         self.loginStatus.setText(testPart.login(self.username.text(), self.password.text()) and "Login Successfully!" or "Login Faild!")
@@ -130,15 +146,15 @@ class Window(QWidget):
         e = testPart.APItest(self.appID.text(), self.appKey.text())
         self.apiStatus.setText(errorCode.get(int(e), "Faild with errorCode: {}".format(str(e))))
 
-    def saveSettings(self, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey):
+    def saveSettings(self, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT)')
-        cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,fromWordbook,fromYoudaoDict,us,uk,phrase,phraseExplain,appID,appKey) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (1, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey))
-        cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,fromWordbook=?,fromYoudaoDict=?,us=?,uk=?,phrase=?,phraseExplain=?,appID=?,appKey=? WHERE id=1',
-                       (username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey))
+            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT, fromPublicAPI INTEGER)')
+        cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,fromWordbook,fromYoudaoDict,us,uk,phrase,phraseExplain,appID,appKey,fromPublicAPI) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (1, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI))
+        cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,fromWordbook=?,fromYoudaoDict=?,us=?,uk=?,phrase=?,phraseExplain=?,appID=?,appKey=?,fromPublicAPI=? WHERE id=1',
+                       (username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI))
         cursor.rowcount
         conn.commit()
         conn.close()
@@ -147,7 +163,7 @@ class Window(QWidget):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT)')
+            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT,fromPublicAPI INTEGER)')
         cursor.execute('select * from settings')
         values = cursor.fetchall()
         if values:
@@ -162,12 +178,13 @@ class Window(QWidget):
             phraseExplain = ((values[0][9] == 1) and True or False)
             appID = values[0][10]
             appKey = values[0][11]
+            fromPublicAPI = ((values[0][12] == 1) and True or False)
         else:
             return False
         cursor.rowcount
         conn.commit()
         conn.close()
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey]
+        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
 
 
 class testPart(object):
@@ -222,4 +239,3 @@ def runYoudaoPlugin():
 action = QAction("Import your Youdao WordList", mw)
 mw.connect(action, SIGNAL("triggered()"), runYoudaoPlugin)
 mw.form.menuTools.addAction(action)
-
