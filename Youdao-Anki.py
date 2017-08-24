@@ -43,7 +43,7 @@ class Window(QWidget):
         super(Window, self).__init__(parent)
         self.results = None
         self.thread = None
-
+        self.settings = None
         # settings = self.retriveSettings()
         uic.loadUi("../../addons/youdao.ui", self)  # load ui from *.ui file
         self.setupUI(self)  # setupUI
@@ -107,6 +107,7 @@ class Window(QWidget):
     def clickSync(self):
         self.testOption = "no"
         settings = self.getSettingsFromUI(self)
+        self.settings = settings
         if settings[0] == '' or settings[1] == '':
             self.tabWidget.setCurrentIndex(1)
             showInfo('\n\nPlease enter your Username and Password!')
@@ -126,13 +127,9 @@ class Window(QWidget):
                 mw.app.processEvents()
                 self.thread.wait(50)
 
-            if settings[3] == 1:
-                showInfo("only wordbook")
-            elif settings[4] == 1:
-                if settings[11] == 1:
-                    showInfo("fromPublicAPI " + str(settings[5:9]))
-                else:
-                    showInfo("fromPrivateAPI " + str(settings[5:11]))
+            # got finally data from here
+            self.debug.clear()
+            self.debug.appendPlainText(self.thread.results)
 
     def clickLoginTest(self):
         self.testOption = "login"
@@ -242,7 +239,7 @@ class YoudaoDownloader(QThread):
         self.errorCode = 1000
 
     def run(self):
-        """run thread; download results!"""
+        # test login
         if self.window.testOption == "login":
             if self.login(self.window.username.text(), self.window.password.text()):
                 self.window.loginStatus.setText("Login Successfully!")
@@ -251,11 +248,14 @@ class YoudaoDownloader(QThread):
             self.window.loginTest.setText("Check")
             self.window.loginTest.setEnabled(True)
 
+        # test API
         elif self.window.testOption == "API":
             self.errorCode = self.APITest(self.window.appID.text(), self.window.appKey.text())
+
+        # grab data from wordbook
         else:
             # get youdao wordlist
-            parser = parseWordbook()
+            parser = parseWordbook(self.window)
             if not self.login(self.window.username.text(), self.window.password.text()):
                 # self.window.loginFailed()
                 self.window.username.setPlaceholderText('Login Failed!! Please Check Userinfo!!')
@@ -264,17 +264,21 @@ class YoudaoDownloader(QThread):
             else:
                 totalPage = self.totalPage()
                 self.window.progress.setMaximum(totalPage)
+                self.window.progress.setValue(0)
 
                 for index in range(0, totalPage):
                     self.window.progress.setValue(index + 1)
                     # trigger progressBar everysingle time
                     parser.feed(self.crawler(index))
 
+                self.window.progress.setValue(0)
+
                 previous = parser.retrivePrevious()
                 if previous:
                     self.results = json.dumps(parser.compare(previous))
+
                 else:
-                    self.results = json.dumps(parser.nocompare())
+                    self.results = json.dumps(parser.nocompare(), indent=4)
 
                 # if no results, there was an error
                 if self.results is None:
@@ -288,7 +292,7 @@ class YoudaoDownloader(QThread):
 
         url = "https://logindict.youdao.com/login/acc/login"
         payload = "username=" + urllib.quote(username) + "&password=" + password + \
-            "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true"
+            "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
         headers = {
             'cache-control': "no-cache",
             'content-type': "application/x-www-form-urlencoded"
@@ -339,9 +343,10 @@ class YoudaoDownloader(QThread):
             pass
 
 
-class parseWordbook(HTMLParser):
-    def __init__(self):
+class parseWordbook(HTMLParser, object):
+    def __init__(self, window):
         HTMLParser.__init__(self)
+        self.window = window
         self.terms = []
         self.definitions = []
         conn = sqlite3.connect('youdao-anki.db')
@@ -374,9 +379,46 @@ class parseWordbook(HTMLParser):
         for index, value in enumerate(self.terms):
             data['terms'].append({'term': value, 'definition': self.definitions[index]})
 
-        self.savePreviews(self.terms, self.definitions)
-        self.saveSyncHistory(self.terms, self.definitions)
-        return data
+        # self.savePreviews(self.terms, self.definitions)
+        # self.saveSyncHistory(self.terms, self.definitions)
+
+        # wordbook only
+        # the phrase option posibilities
+        '''
+        K:1	    KS:3    KR:5	KE:8    KSR:7   KRE:12  KSRE:14
+        S:2	    SR:6    SE:9    SRE:13
+        R:4	    RE:11
+        E:7
+        '''
+        self.window.progress.setMaximum(len(data['terms']))
+        if self.window.settings[3] == 1:
+            # result = json.loads(self.thread.results)
+            return data
+        # get more from API
+        elif self.window.settings[4] == 1:
+
+            # fromPublicAPI self.window.settings[5:9]
+            if self.window.settings[11] == 1:
+                for index, value in enumerate(data['terms']):
+                    search = API.publicAPI(value['term'], self.window)
+                    value["uk_phonetic"] = search["uk_phonetic"]
+                    value["us_phonetic"] = search["us_phonetic"]
+                    value["definition"] = search["definition"]
+                    value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]
+                                       }
+                return data
+
+            # fromPrivateAPI self.window.settings[5:11]
+            else:
+                api = API(self.window.appID.text(), self.window.appKey.text(), self.window)
+                for index, value in enumerate(data['terms']):
+                    search = api.request(value['term'])
+                    value["uk_phonetic"] = search["uk_phonetic"]
+                    value["us_phonetic"] = search["us_phonetic"]
+                    value["definition"] = search["definition"]
+                    value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]
+                                       }
+                return data
 
     def savePreviews(self, terms, definitions):
         conn = sqlite3.connect('youdao-anki.db')
@@ -418,46 +460,126 @@ class parseWordbook(HTMLParser):
         return [terms, definitions]
 
 
-class testPart(QThread):
-    @classmethod
-    def login(self, username, password):
-        password = hashlib.md5(password.encode('utf-8')).hexdigest()
-        url = "https://logindict.youdao.com/login/acc/login"
-        payload = "username=" + urllib.quote(username) + "&password=" + password + "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true"
-        headers = {
-            'cache-control': "no-cache",
-            'content-type': "application/x-www-form-urlencoded"
-        }
-        url = url + '?' + payload
-        req = urllib2.Request(url, headers=headers)
-        cookie = cookielib.CookieJar()
-        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
-        self.req = urllib2.install_opener(self.opener)
-        response = urllib2.urlopen(req)
-        if "登录" in response.read():
-            return False
-        else:
-            return True
+class API(object):
+    def __init__(self, appID, appKey, window):
+        self.url = 'http://fanyi.youdao.com/openapi.do'
+        self.appKey = appKey
+        self.appID = appID
+        self._from = "EN"
+        self.to = "zh-CHS"
+        self.window = window
 
-    @classmethod
-    def APItest(self, appID, appKey):
-        q = "test"
-        salt = str(int(time.time()))
+    def request(self, q):
+        self.q = q
+        self.salt = str(int(time.time()))
         s = hashlib.md5()
-        s.update(appID + q + salt + appKey)
-        sign = s.hexdigest()
+        s.update(self.appID + self.q + self.salt + self.appKey)
+        self.sign = s.hexdigest()
         params = urllib.urlencode({
-            'q': q,
-            'from': "EN",
-            'to': "zh-CHS",
-            'sign': sign,
-            'salt': salt,
-            'appKey': appID
+            'q': self.q,
+            'from': self._from,
+            'to': self.to,
+            'sign': self.sign,
+            'salt': self.salt,
+            'appKey': self.appID
         })
 
         f = urllib2.urlopen('http://openapi.youdao.com/api?' + params)
         json_result = json.loads(f.read())
-        return json_result['errorCode']
+        try:
+            explains = ",".join(json_result["basic"]["explains"])
+        except:
+            try:
+                explains = ",".join(json_result["web"][0]["value"])
+            except:
+                explains = "No definition"
+
+        try:
+            uk_phonetic = json_result["basic"]["uk-phonetic"]
+        except:
+            uk_phonetic = "No UK Phonetic"
+        try:
+            us_phonetic = json_result["basic"]["us-phonetic"]
+        except:
+            us_phonetic = "No US Phonetic"
+
+        try:
+            phrase = json_result["web"][1]["key"]
+
+        except:
+            phrase = "No Phrase"
+
+        try:
+            phrase_explains = ",".join(json_result["web"][1]["value"])
+        except:
+            phrase_explains = "No Phrase"
+
+        # indicate api progress
+        self.window.progress.setValue(self.window.progress.value() + 1)
+        return {"uk_phonetic": uk_phonetic,
+                "us_phonetic": us_phonetic,
+                "definition": explains,
+                "phrase": phrase,
+                "phrase_explains": phrase_explains
+                }
+
+    @classmethod
+    def publicAPI(self, q, window):
+        query = urllib.urlencode({"q": q})
+        f = urllib2.urlopen("https://dict.youdao.com/jsonapi?{}&dicts=%7B%22count%22%3A%2099%2C%22dicts%22%3A%20%5B%5B%22ec%22%2C%22phrs%22%5D%2C%5B%22web_trans%22%5D%2C%5B%22fanyi%22%5D%5D%7D".format(query))
+        r = f.read()
+        json_result = json.loads(r)
+        try:
+            explains = json_result["ec"]["word"][0]["trs"][0]["tr"][0]["l"]["i"][0]
+        except:
+            try:
+                explains = json_result["web_trans"]["web-translation"][0]["trans"][0]["value"]
+            except:
+                try:
+                    explains = json_result["fanyi"]["tran"]
+                except:
+                    explains = "No definition"
+
+        try:
+            uk_phonetic = json_result["ec"]["word"][0]["ukphone"]
+        except:
+            try:
+                uk_phonetic = json_result["simple"]["word"][0]["ukphone"]
+            except:
+                try:
+                    uk_phonetic = json_result["ec"]["word"][0]["phone"]
+                except:
+                    uk_phonetic = "No UK Phonetic"
+
+        try:
+            us_phonetic = json_result["ec"]["word"][0]["usphone"]
+        except:
+            try:
+                us_phonetic = json_result["simple"]["word"][0]["usphone"]
+            except:
+                try:
+                    us_phonetic = json_result["ec"]["word"][0]["phone"]
+                except:
+                    us_phonetic = "No US Phonetic"
+        try:
+            phrase = json_result["phrs"]["phrs"][0]["phr"]["headword"]["l"]["i"]
+        except:
+            phrase = "No phrase"
+
+        try:
+            phrase_explains = json_result["phrs"]["phrs"][0]["phr"]["trs"][0]["tr"]["l"]["i"]
+        except:
+            phrase_explains = "No phrase definition"
+
+        window.progress.setValue(window.progress.value() + 1)
+
+        return {
+            "uk_phonetic": uk_phonetic,
+            "us_phonetic": us_phonetic,
+            "definition": explains,
+            "phrase": phrase,
+            "phrase_explains": phrase_explains
+        }
 
 
 def runYoudaoPlugin():
