@@ -121,6 +121,7 @@ class Window(QWidget):
             # [0username, 1password, 2deckname, 3fromWordbook, 4fromYoudaoDict, 5us, 6uk, 7phrase, 8phraseExplain, 9appID, 10appKey,11fromPublicAPI]
             self.tabWidget.setEnabled(False)
             self.sync.setText("Wait")
+            # self.progressLabel.setText("Fetching Words")
             # stop the previous thread first
             if self.thread is not None:
                 self.thread.terminate()
@@ -195,10 +196,10 @@ class Window(QWidget):
         deckname = window.deck.text()
         fromWordbook = window.fromWordbook.isChecked() and 1 or 0
         fromYoudaoDict = window.fromYoudaoDict.isChecked() and 1 or 0
-        us = window.us_phonetic.isChecked() and 1 or 0
+        us = window.us_phonetic.isChecked() and 2 or 0
         uk = window.uk_phonetic.isChecked() and 1 or 0
-        phrase = window.phrase.isChecked() and 1 or 0
-        phraseExplain = window.phraseExplain.isChecked() and 1 or 0
+        phrase = window.phrase.isChecked() and 4 or 0
+        phraseExplain = window.phraseExplain.isChecked() and 8 or 0
         appID = window.appID.text()
         appKey = window.appKey.text()
         fromPublicAPI = window.fromPublicAPI.isChecked() and 1 or 0
@@ -217,10 +218,10 @@ class Window(QWidget):
             deckname = values[0][3]
             fromWordbook = ((values[0][4] == 1) and True or False)
             fromYoudaoDict = ((values[0][5] == 1) and True or False)
-            us = ((values[0][6] == 1) and True or False)
+            us = ((values[0][6] == 2) and True or False)
             uk = ((values[0][7] == 1) and True or False)
-            phrase = ((values[0][8] == 1) and True or False)
-            phraseExplain = ((values[0][9] == 1) and True or False)
+            phrase = ((values[0][8] == 4) and True or False)
+            phraseExplain = ((values[0][9] == 8) and True or False)
             appID = values[0][10]
             appKey = values[0][11]
             fromPublicAPI = ((values[0][12] == 1) and True or False)
@@ -258,6 +259,7 @@ class YoudaoDownloader(QThread):
 
         # grab data from wordbook
         else:
+            self.window.progressLabel.setText("Fetching Words")
             # get youdao wordlist
             parser = parseWordbook(self.window)
             if not self.login(self.window.username.text(), self.window.password.text()):
@@ -299,8 +301,17 @@ class YoudaoDownloader(QThread):
         payload = "username=" + urllib.quote(username) + "&password=" + password + \
             "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
         headers = {
-            'cache-control': "no-cache",
-            'content-type': "application/x-www-form-urlencoded"
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en,zh-CN;q=0.8,zh;q=0.6',
+            'Cache-Control': 'max-age=0',
+            'Connection': 'keep-alive',
+            'Host': 'logindict.youdao.com',
+            'Origin': 'http://account.youdao.com',
+            'Referer': 'http://account.youdao.com/login?service=dict&back_url=http://dict.youdao.com/wordbook/wordlist%3Fkeyfrom%3Dlogin_from_dict2.index',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded'
         }
         url = url + '?' + payload
         req = urllib2.Request(url, headers=headers)
@@ -414,7 +425,6 @@ class parseWordbook(HTMLParser, object):
                     value["definition"] = search["definition"]
                     value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]
                                        }
-                return data
 
             # fromPrivateAPI self.window.settings[5:11]
             else:
@@ -424,9 +434,58 @@ class parseWordbook(HTMLParser, object):
                     value["uk_phonetic"] = search["uk_phonetic"]
                     value["us_phonetic"] = search["us_phonetic"]
                     value["definition"] = search["definition"]
-                    value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]
-                                       }
-                return data
+                    value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]}
+            # return self.processData(data, self.window.settings[5:9])
+            return self.processData(data, self.window.settings[5:9])
+
+    def processData(self, results, args):
+        option = sum(args)
+        for data in results['terms']:
+            if option is 0:
+                data.pop("phrase")
+                data.pop("us_phonetic")
+                data.pop("uk_phonetic")
+            elif option is 1:
+                data.pop("phrase")
+                data.pop("us_phonetic")
+            elif option is 2:
+                data.pop("phrase")
+                data.pop("uk_phonetic")
+            elif option is 3:
+                data.pop("phrase")
+            elif option is 4:
+                data["phrase"].pop("phrase_explains")
+                data.pop("uk_phonetic")
+                data.pop("us_phonetic")
+            elif option is 5:
+                data["phrase"].pop("phrase_explains")
+                data.pop("us_phonetic")
+            elif option is 6:
+                data["phrase"].pop("phrase_explains")
+                data.pop("uk_phonetic")
+            elif option is 7:
+                data["phrase"].pop("phrase_explains")
+            elif option is 8:
+                data.pop("phrase")
+                data.pop("us_phonetic")
+                data.pop("uk_phonetic")
+            elif option is 9:
+                data.pop("phrase")
+                data.pop("us_phonetic")
+            elif option is 10:
+                data.pop("phrase")
+                data.pop("uk_phonetic")
+            elif option is 11:
+                data.pop("phrase")
+            elif option is 12:
+                data.pop("uk_phonetic")
+                data.pop("us_phonetic")
+            elif option is 13:
+                data.pop("us_phonetic")
+            elif option is 14:
+                data.pop("uk_phonetic")
+
+        return results
 
     def savePreviews(self, terms, definitions):
         conn = sqlite3.connect('youdao-anki.db')
