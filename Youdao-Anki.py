@@ -23,6 +23,75 @@ from PyQt4.QtGui import *
 __window = None
 
 
+class Note(object):
+    css = '''<style>.card {font-family: arial;font-size: 14px;text-align: left;color: #212121;background-color: white;}#phrsListTab h2 {line-height: 30px;font-size: 24px;margin-bottom: 0px;overflow: hidden;word-break: break-all;}.pronounce {margin-right: 30px;font-size: 14px;display: inline-block;line-height: 26px;}.phonetic{font-size: 14px;margin-left: .2em;font-family: "lucida sans unicode",arial,sans-serif;color: #01848f}.keyword {vertical-align: bottom;margin-right: 15px;}.trans-container {margin: 1em 0 2em 0;border-bottom: 2px solid #4caf50;}ul, ol, li {list-style: none;padding: 0;font-weight: bold;}.phrase{color:#01848f;padding-right: 1em;}</style>'''
+
+    @classmethod
+    def returnFront(self, Nphrase):
+        base = '''<div id="phrsListTab"><h2><span class="keyword">{{''' + '''term}}</span><div class="baav"><span class="pronounce">英<span class="phonetic">[{{uk-phonetic}}]</span></span><span class="pronounce">美<span class="phonetic">[{{us-phonetic}}]</span></span></div></h2><div class="trans-container"><ul><li>轻按查看定义</li></ul></div></div><ul>'''
+        a = ''
+        for i in range(0, Nphrase):
+            a += '<p><span style="color:#01848f;padding-right: 1em;">{{' + ("phrase" + str(i)) + '}}: ?</p>'
+        a += '</ul>'
+        return(Note.css + base + a)
+
+    @classmethod
+    def returnBack(self, Nphrase):
+        base = '''<div id="phrsListTab"><h2><span class="keyword">{{''' + '''term}}</span><div class="baav"><span class="pronounce">英<span class="phonetic">[{{uk-phonetic}}]</span></span><span class="pronounce">美<span class="phonetic">[{{us-phonetic}}]</span></span></div></h2><div class="trans-container"><ul><li>{{''' + '''definition}}</li></ul></div></div><ul>'''
+        a = ''
+        for i in range(0, Nphrase):
+            a += '''<p><span style="color:#01848f;padding-right: 1em;">{{phrase''' + str(i) + '''}}: {{phraseExplain''' + str(i) + '''}}</p>'''
+        a += '</ul>'
+        return (Note.css + base + a)
+
+
+def addCustomModel(name, col):
+    """create a new custom model for the imported deck"""
+    mm = col.models
+    existing = mm.byName("YoudaoWordBook")
+    if existing:
+        return existing
+    m = mm.new("YoudaoWordBook")
+    # add fields
+    mm.addField(m, mm.newField("term"))
+    mm.addField(m, mm.newField("definition"))
+    mm.addField(m, mm.newField("uk-phonetic"))
+    mm.addField(m, mm.newField("us-phonetic"))
+    mm.addField(m, mm.newField("phrase0"))
+    mm.addField(m, mm.newField("phrase1"))
+    mm.addField(m, mm.newField("phrase2"))
+    mm.addField(m, mm.newField("phraseExplain0"))
+    mm.addField(m, mm.newField("phraseExplain1"))
+    mm.addField(m, mm.newField("phraseExplain2"))
+
+    # add cards
+    t = mm.newTemplate("Normal")
+    t['qfmt'] = Note.returnFront(1)
+    t['afmt'] = Note.returnBack(1)
+
+    mm.addTemplate(m, t)
+
+    mm.add(m)
+    return m
+
+
+def testMode():
+    deck = mw.col.decks.get(mw.col.decks.id("test"))
+    model = addCustomModel("test", mw.col)
+
+    # assign custom model to new deck
+    mw.col.decks.select(deck["id"])
+    mw.col.decks.get(deck)["mid"] = model["id"]
+    mw.col.decks.save(deck)
+
+    # assign new deck to custom model
+    mw.col.models.setCurrent(model)
+    mw.col.models.current()["did"] = deck["id"]
+    mw.col.models.save(model)
+    mw.col.reset()
+    mw.reset()
+
+
 """
 deck, sync
 fromWordbook, fromYoudaoDict
@@ -35,9 +104,6 @@ appID, appKey, apiTest,fromPublicAPI
 """
 
 
-def match(a, b): return [b[i] if x == "" else x for i, x in enumerate(a)] == b
-
-
 class Window(QWidget):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
@@ -48,6 +114,7 @@ class Window(QWidget):
         uic.loadUi("../../addons/youdao.ui", self)  # load ui from *.ui file
         self.setupUI(self)  # setupUI
         self.updateSettings(self)
+        testMode()
         self.show()  # shows the window
 
     def setupUI(self, window):
@@ -132,9 +199,17 @@ class Window(QWidget):
                 mw.app.processEvents()
                 self.thread.wait(50)
 
-            # got finally data from here
-            self.debug.clear()
-            self.debug.appendPlainText(self.thread.results)
+            # error with fetching data
+            if self.thread.error:
+                self.debug.appendPlainText("Something went wrong")
+            else:
+                # result = json.loads(self.thread.results)
+                # self.syncYoudao(result)
+                # got finally data from here
+                self.debug.appendPlainText(self.thread.results)
+
+            self.thread.terminate()
+            self.thread = None
 
     def clickLoginTest(self):
         self.testOption = "login"
@@ -301,15 +376,8 @@ class YoudaoDownloader(QThread):
         payload = "username=" + urllib.quote(username) + "&password=" + password + \
             "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
         headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en,zh-CN;q=0.8,zh;q=0.6',
-            'Cache-Control': 'max-age=0',
-            'Connection': 'keep-alive',
-            'Host': 'logindict.youdao.com',
-            'Origin': 'http://account.youdao.com',
+            'Cache-Control': '"no-cache"',
             'Referer': 'http://account.youdao.com/login?service=dict&back_url=http://dict.youdao.com/wordbook/wordlist%3Fkeyfrom%3Dlogin_from_dict2.index',
-            'Upgrade-Insecure-Requests': '1',
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
