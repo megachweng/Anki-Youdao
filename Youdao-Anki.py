@@ -114,7 +114,7 @@ class Window(QWidget):
         uic.loadUi("../../addons/youdao.ui", self)  # load ui from *.ui file
         self.setupUI(self)  # setupUI
         self.updateSettings(self)
-        testMode()
+        # testMode()
         self.show()  # shows the window
 
     def setupUI(self, window):
@@ -461,7 +461,7 @@ class parseWordbook(HTMLParser, object):
         data = {'deleted': [None], 'terms': []}
 
         for index, value in enumerate(self.terms):
-            data['terms'].append({'term': value, 'definition': self.definitions[index]})
+            data['terms'].append({'term': value, 'definition': self.definitions[index], "phrase": {'phrase_terms': [], 'phrase_explains': []}})
 
         # self.savePreviews(self.terms, self.definitions)
         # self.saveSyncHistory(self.terms, self.definitions)
@@ -483,16 +483,16 @@ class parseWordbook(HTMLParser, object):
         # get more from API
         elif self.window.settings[4] == 1:
             self.window.progress.setValue(0)
+
             # fromPublicAPI self.window.settings[5:9]
             if self.window.settings[11] == 1:
-
                 for index, value in enumerate(data['terms']):
                     search = API.publicAPI(value['term'], self.window)
                     value["uk_phonetic"] = search["uk_phonetic"]
                     value["us_phonetic"] = search["us_phonetic"]
                     value["definition"] = search["definition"]
-                    value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]
-                                       }
+                    value['phrase']["phrase_terms"] = search["phrases"]
+                    value['phrase']["phrase_explains"] = search["phrase_explains"]
 
             # fromPrivateAPI self.window.settings[5:11]
             else:
@@ -502,7 +502,8 @@ class parseWordbook(HTMLParser, object):
                     value["uk_phonetic"] = search["uk_phonetic"]
                     value["us_phonetic"] = search["us_phonetic"]
                     value["definition"] = search["definition"]
-                    value["phrase"] = {"phrase_terms": search["phrase"], "phrase_explains": search["phrase_explains"]}
+                    value['phrase']["phrase_terms"] = search["phrases"]
+                    value['phrase']["phrase_explains"] = search["phrase_explains"]
             # return self.processData(data, self.window.settings[5:9])
             return self.processData(data, self.window.settings[5:9])
 
@@ -639,14 +640,15 @@ class API(object):
             us_phonetic = "No US Phonetic"
 
         try:
-            phrase = json_result["web"][1]["key"]
-
+            phrases = []
+            phrase_explains = []
+            json_phrase = json_result["web"]
+            nphrases = len(json_phrase)
+            for i in range(1, nphrases):
+                phrases.append(json_phrase[i]['key'])
+                phrase_explains.append(json_phrase[i]['value'][0])
         except:
-            phrase = "No Phrase"
-
-        try:
-            phrase_explains = ",".join(json_result["web"][1]["value"])
-        except:
+            phrases = "No Phrase"
             phrase_explains = "No Phrase"
 
         # indicate api progress
@@ -654,7 +656,7 @@ class API(object):
         return {"uk_phonetic": uk_phonetic,
                 "us_phonetic": us_phonetic,
                 "definition": explains,
-                "phrase": phrase,
+                "phrases": phrases,
                 "phrase_explains": phrase_explains
                 }
 
@@ -697,13 +699,14 @@ class API(object):
                 except:
                     us_phonetic = "No US Phonetic"
         try:
-            phrase = json_result["phrs"]["phrs"][0]["phr"]["headword"]["l"]["i"]
+            phrases = []
+            phrase_explains = []
+            json_phrases = json_result["phrs"]["phrs"]
+            for value in json_phrases:
+                phrases.append(value["phr"]["headword"]["l"]["i"])
+                phrase_explains.append(value["phr"]["trs"][0]["tr"]["l"]["i"])
         except:
-            phrase = "No phrase"
-
-        try:
-            phrase_explains = json_result["phrs"]["phrs"][0]["phr"]["trs"][0]["tr"]["l"]["i"]
-        except:
+            phrases = "No phrase"
             phrase_explains = "No phrase definition"
 
         window.progress.setValue(window.progress.value() + 1)
@@ -712,7 +715,7 @@ class API(object):
             "uk_phonetic": uk_phonetic,
             "us_phonetic": us_phonetic,
             "definition": explains,
-            "phrase": phrase,
+            "phrases": phrases,
             "phrase_explains": phrase_explains
         }
 
