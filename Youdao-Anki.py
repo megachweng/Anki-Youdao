@@ -518,9 +518,7 @@ class parseWordbook(HTMLParser, object):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists syncHistory (id INTEGER primary key, added TEXT,deleted TEXT,time varchar(20))')
-        cursor.execute(
-            'create table if not exists history (id INTEGER primary key, terms TEXT,definitions TEXT,time varchar(20))')
+            'create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20))')
         cursor.rowcount
         cursor.close()
         conn.commit()
@@ -545,10 +543,8 @@ class parseWordbook(HTMLParser, object):
         for index, value in enumerate(self.terms):
             data['terms'].append({'term': value, 'definition': self.definitions[index], "phrase": {'phrase_terms': [], 'phrase_explains': []}})
 
-        self.savePreviews(self.terms, self.definitions)
-        # self.saveSyncHistory(self.terms, self.definitions)
+        self.savePreviews(self.terms)
 
-        # wordbook only
         # the phrase option posibilities
         '''
         K:1	    KS:3    KR:5	KE:8    KSR:7   KRE:12  KSRE:14
@@ -558,9 +554,9 @@ class parseWordbook(HTMLParser, object):
         '''
         self.window.progress.setMaximum(len(data['terms']))
         self.window.progressLabel.setText("Fetching Details")
+        # wordbook only
         if self.window.settings[3] == 1:
             self.window.progress.setValue(0)
-            # data['term'].pop['phrase']
             self.window.debug.appendPlainText(json.dumps(data))
             return data
         # get more from API
@@ -638,25 +634,13 @@ class parseWordbook(HTMLParser, object):
 
         return results
 
-    def savePreviews(self, terms, definitions):
+    def savePreviews(self, terms):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists history (id INTEGER primary key, terms TEXT,definitions TEXT,time varchar(20))')
-        cursor.execute('insert into history (terms,definitions,time) values (?,?,?)',
-                       (pickle.dumps(terms), (pickle.dumps(definitions)), time.strftime("%Y-%m-%d")))
-        cursor.rowcount
-        cursor.close()
-        conn.commit()
-        conn.close()
-
-    def saveSyncHistory(self, added, deleted):
-        conn = sqlite3.connect('youdao-anki.db')
-        cursor = conn.cursor()
-        cursor.execute(
-            'create table if not exists syncHistory (id INTEGER primary key, added TEXT,deleted TEXT,time varchar(20))')
-        cursor.execute('insert into syncHistory (added,deleted,time) values (?,?,?)',
-                       (pickle.dumps(added), (pickle.dumps(deleted)), time.strftime("%Y-%m-%d")))
+            'create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20))')
+        cursor.execute('insert into history (terms,time) values (?,?)',
+                       (pickle.dumps(terms), time.strftime("%Y-%m-%d")))
         cursor.rowcount
         cursor.close()
         conn.commit()
@@ -670,12 +654,12 @@ class parseWordbook(HTMLParser, object):
         # values[number of raw][0->id,1->terms,2->definitions,3->time]
         if values:
             terms = pickle.loads(values[0][1])
-            definitions = pickle.loads(values[0][2])
+            # definitions = pickle.loads(values[0][2])
         else:
             return False
         cursor.close()
         conn.close()
-        return [terms, definitions]
+        return terms
 
 
 class API(object):
