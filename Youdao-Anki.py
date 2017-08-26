@@ -28,19 +28,19 @@ class Note(object):
 
     @classmethod
     def returnFront(self, Nphrase):
-        base = '''<div id="phrsListTab"><h2><span class="keyword">{{''' + '''term}}</span><div class="baav"><span class="pronounce">英<span class="phonetic">[{{uk-phonetic}}]</span></span><span class="pronounce">美<span class="phonetic">[{{us-phonetic}}]</span></span></div></h2><div class="trans-container"><ul><li>轻按查看定义</li></ul></div></div><ul>'''
+        base = '''<div id="phrsListTab"><h2><span class="keyword">{{''' + '''term}}</span><div class="baav"><span class="pronounce">英<span class="phonetic">[{{''' + '''uk_phonetic}}]</span></span><span class="pronounce">美<span class="phonetic">[{{''' + '''us_phonetic}}]</span></span></div></h2><div class="trans-container"><ul><li>轻按查看定义</li></ul></div></div><ul>'''
         a = ''
         for i in range(0, Nphrase):
-            a += '<p><span style="color:#01848f;padding-right: 1em;">{{' + ("phrase" + str(i)) + '}}: ?</p>'
+            a += '<p><span style="color:#01848f;padding-right: 1em;">{{' + ("phrase" + str(i)) + '}}</p>'
         a += '</ul>'
         return(Note.css + base + a)
 
     @classmethod
     def returnBack(self, Nphrase):
-        base = '''<div id="phrsListTab"><h2><span class="keyword">{{''' + '''term}}</span><div class="baav"><span class="pronounce">英<span class="phonetic">[{{uk-phonetic}}]</span></span><span class="pronounce">美<span class="phonetic">[{{us-phonetic}}]</span></span></div></h2><div class="trans-container"><ul><li>{{''' + '''definition}}</li></ul></div></div><ul>'''
+        base = '''<div id="phrsListTab"><h2><span class="keyword">{{''' + '''term}}</span><div class="baav"><span class="pronounce">英<span class="phonetic">[{{''' + '''uk_phonetic}}]</span></span><span class="pronounce">美<span class="phonetic">[{{''' + '''us_phonetic}}]</span></span></div></h2><div class="trans-container"><ul><li>{{''' + '''definition}}</li></ul></div></div><ul>'''
         a = ''
         for i in range(0, Nphrase):
-            a += '''<p><span style="color:#01848f;padding-right: 1em;">{{phrase''' + str(i) + '''}}: {{phraseExplain''' + str(i) + '''}}</p>'''
+            a += '''<p><span style="color:#01848f;padding-right: 1em;">{{phrase''' + str(i) + '''}} {{phraseExplain''' + str(i) + '''}}</p>'''
         a += '</ul>'
         return (Note.css + base + a)
 
@@ -55,8 +55,8 @@ def addCustomModel(name, col):
     # add fields
     mm.addField(m, mm.newField("term"))
     mm.addField(m, mm.newField("definition"))
-    mm.addField(m, mm.newField("uk-phonetic"))
-    mm.addField(m, mm.newField("us-phonetic"))
+    mm.addField(m, mm.newField("uk_phonetic"))
+    mm.addField(m, mm.newField("us_phonetic"))
     mm.addField(m, mm.newField("phrase0"))
     mm.addField(m, mm.newField("phrase1"))
     mm.addField(m, mm.newField("phrase2"))
@@ -66,8 +66,8 @@ def addCustomModel(name, col):
 
     # add cards
     t = mm.newTemplate("Normal")
-    t['qfmt'] = Note.returnFront(1)
-    t['afmt'] = Note.returnBack(1)
+    t['qfmt'] = Note.returnFront(3)
+    t['afmt'] = Note.returnBack(3)
 
     mm.addTemplate(m, t)
 
@@ -88,8 +88,6 @@ def testMode():
     mw.col.models.setCurrent(model)
     mw.col.models.current()["did"] = deck["id"]
     mw.col.models.save(model)
-    mw.col.reset()
-    mw.reset()
 
 
 """
@@ -107,7 +105,7 @@ appID, appKey, apiTest,fromPublicAPI
 class Window(QWidget):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
-        self.results = None
+        self.terms = []
         self.thread = None
         self.settings = None
         # settings = self.retriveSettings()
@@ -132,6 +130,7 @@ class Window(QWidget):
         window.fromYoudaoDict.toggled.connect(lambda: window.phraseExplain.setEnabled(window.phrase.isChecked()))
         window.fromWordbook.toggled.connect(lambda: window.apiStatus.setText("Select 'From Youdao' radioButtom first"))
         window.sync.clicked.connect(self.clickSync)
+        window.reset.clicked.connect(self.clickRest)
         window.loginTest.clicked.connect(self.clickLoginTest)
         window.apiTest.clicked.connect(self.clikAPITest)
         window.tabWidget.setCurrentIndex(0)
@@ -174,6 +173,26 @@ class Window(QWidget):
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
 
+    def clickRest(self):
+        cardID = []
+        for iterm in self.terms:
+            cardsToDelete = []
+            deckID = mw.col.decks.id('Youdao')
+            cardID.append(mw.col.findCards("term:" + iterm))
+            for iterm in cardID:
+                for cid in iterm:
+                    query = "select id from cards where did = " + \
+                        str(deckID) + " and id= " + str(cid)
+                    r = mw.col.db.list(query)
+                    if r:
+                        cardsToDelete.append(r[0])
+
+        for iterm in cardsToDelete:
+            mw.col.db.execute("delete from cards where id = ?", iterm)
+            mw.col.db.execute("delete from notes where id = ?", iterm)
+        mw.col.fixIntegrity()
+        mw.reset()
+
     def clickSync(self):
         self.testOption = "no"
         settings = self.getSettingsFromUI(self)
@@ -203,13 +222,76 @@ class Window(QWidget):
             if self.thread.error:
                 self.debug.appendPlainText("Something went wrong")
             else:
-                # result = json.loads(self.thread.results)
-                # self.syncYoudao(result)
+                result = json.loads(self.thread.results)
+                # save terms prepare to reset
+                for value in result['terms']:
+                    self.terms.append(value['term'])
+                # save data to Anki Card
+                self.syncYoudao(result, settings[2])
+
                 # got finally data from here
                 self.debug.appendPlainText(self.thread.results)
 
             self.thread.terminate()
             self.thread = None
+
+    def syncYoudao(self, result, name):
+        deleted = result['deleted']
+        terms = result['terms']
+        cardID = []
+        info_add = '0'
+        info_delete = '0'
+
+        if terms[0] is not None:
+            deck = mw.col.decks.get(mw.col.decks.id(name))
+            model = addCustomModel(name, mw.col)
+
+            # assign custom model to new deck
+            mw.col.decks.select(deck["id"])
+            mw.col.decks.get(deck)["mid"] = model["id"]
+            mw.col.decks.save(deck)
+
+            # assign new deck to custom model
+            mw.col.models.setCurrent(model)
+            mw.col.models.current()["did"] = deck["id"]
+            mw.col.models.save(model)
+
+            for term in terms:
+                note = mw.col.newNote()
+                note['term'] = term['term']
+                note['definition'] = term['definition']
+                if 'uk_phonetic' in term.keys():
+                    note['uk_phonetic'] = term['uk_phonetic']
+                if 'us_phonetic' in term.keys():
+                    note['us_phonetic'] = term['us_phonetic']
+                # # need to fill phrase field
+                if ('phrase' in term.keys()) and term['phrase']['phrase_terms']:
+                    Nphrases = len(term['phrase']['phrase_terms'])
+                    if ('phrase_terms' in term['phrase']) and ('phrase_explains' in term['phrase']):
+                        for i in range((Nphrases < 3 and Nphrases or 3)):
+                            note['phrase' + str(i)] = term['phrase']['phrase_terms'][i] + "\t"
+                            note['phraseExplain' + str(i)] = term['phrase']['phrase_explains'][i]
+                    else:
+                        for i in range((Nphrases < 3 and Nphrases or 3)):
+                            note['phrase' + str(i)] = term['phrase']['phrase_terms'][i]
+                mw.col.addNote(note)
+                mw.col.reset()
+                mw.reset()
+
+        if deleted[0] is not None:
+            for term in deleted:
+                cardID = mw.col.findCards("term:" + term)
+                deckID = mw.col.decks.id(name)
+            for cid in cardID:
+                nid = mw.col.db.scalar("select nid from cards where id = ? and did = ?", cid, deckID)
+                if nid is not None:
+                    mw.col.db.execute("delete from cards where id =?", cid)
+                    mw.col.db.execute("delete from notes where id =?", nid)
+                mw.col.fixIntegrity()
+                mw.col.reset()
+                mw.reset()
+            # info_delete = str(len(deleted))
+        # showInfo('\nAdded : ' + info_add + '\n\nDeleted : ' + info_delete)
 
     def clickLoginTest(self):
         self.testOption = "login"
@@ -458,12 +540,12 @@ class parseWordbook(HTMLParser, object):
                         self.definitions.append(None)
 
     def nocompare(self):
-        data = {'deleted': [None], 'terms': []}
+        data = {'deleted': [], 'terms': []}
 
         for index, value in enumerate(self.terms):
             data['terms'].append({'term': value, 'definition': self.definitions[index], "phrase": {'phrase_terms': [], 'phrase_explains': []}})
 
-        # self.savePreviews(self.terms, self.definitions)
+        self.savePreviews(self.terms, self.definitions)
         # self.saveSyncHistory(self.terms, self.definitions)
 
         # wordbook only
@@ -478,12 +560,12 @@ class parseWordbook(HTMLParser, object):
         self.window.progressLabel.setText("Fetching Details")
         if self.window.settings[3] == 1:
             self.window.progress.setValue(0)
-            # result = json.loads(self.thread.results)
+            # data['term'].pop['phrase']
+            self.window.debug.appendPlainText(json.dumps(data))
             return data
         # get more from API
         elif self.window.settings[4] == 1:
             self.window.progress.setValue(0)
-
             # fromPublicAPI self.window.settings[5:9]
             if self.window.settings[11] == 1:
                 for index, value in enumerate(data['terms']):
@@ -646,7 +728,7 @@ class API(object):
             nphrases = len(json_phrase)
             for i in range(1, nphrases):
                 phrases.append(json_phrase[i]['key'])
-                phrase_explains.append(json_phrase[i]['value'][0])
+                phrase_explains.append(",".join(json_phrase[i]['value']))
         except:
             phrases = "No Phrase"
             phrase_explains = "No Phrase"
@@ -706,8 +788,8 @@ class API(object):
                 phrases.append(value["phr"]["headword"]["l"]["i"])
                 phrase_explains.append(value["phr"]["trs"][0]["tr"]["l"]["i"])
         except:
-            phrases = "No phrase"
-            phrase_explains = "No phrase definition"
+            phrases = ["No phrase"]
+            phrase_explains = ["No phrase definition"]
 
         window.progress.setValue(window.progress.value() + 1)
 
