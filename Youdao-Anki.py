@@ -80,7 +80,7 @@ class Window(QWidget):
         self.thread = None
         self.settings = None
         # load ui from *.ui file
-        uic.loadUi("../../addons/youdao.ui", self)
+        uic.loadUi("../../addons/YAsupportFiles/main.ui", self)
         self.setupUI(self)
         self.updateSettings(self)
         self.show()  # shows the window
@@ -97,6 +97,33 @@ class Window(QWidget):
         window.loginTest.clicked.connect(self.clickLoginTest)
         window.tabWidget.setCurrentIndex(0)
         window.setWindowTitle("Sync with Youdao wordbook")
+        window.RestoreHistory.clicked.connect(self.clickRestoreHistory)
+        window.deleteHistory.clicked.connect(self.clickDeleteHistory)
+        self.setupHistoryList()
+
+    def setupHistoryList(self):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute('select * from history order by id desc')
+        values = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        # values[number of raw][0->id,1->terms,2->time]
+        for day in values:
+            self.history.addItem(str(day[2]))
+
+    def clickRestoreHistory(self):
+        time = self.history.currentItem().text()
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM history WHERE time='%s'" % time)
+        row = pickle.loads(cursor.fetchone()[1])
+        cursor.close()
+        conn.close()
+        self.debug.appendPlainText(str(row))
+
+    def clickDeleteHistory(self):
+        pass
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
