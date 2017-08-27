@@ -68,38 +68,9 @@ def addCustomModel(name, col):
     t = mm.newTemplate("Normal")
     t['qfmt'] = Note.returnFront(3)
     t['afmt'] = Note.returnBack(3)
-
     mm.addTemplate(m, t)
-
     mm.add(m)
     return m
-
-
-def testMode():
-    deck = mw.col.decks.get(mw.col.decks.id("test"))
-    model = addCustomModel("test", mw.col)
-
-    # assign custom model to new deck
-    mw.col.decks.select(deck["id"])
-    mw.col.decks.get(deck)["mid"] = model["id"]
-    mw.col.decks.save(deck)
-
-    # assign new deck to custom model
-    mw.col.models.setCurrent(model)
-    mw.col.models.current()["did"] = deck["id"]
-    mw.col.models.save(model)
-
-
-"""
-deck, sync
-fromWordbook, fromYoudaoDict
-us_phonetic, uk_phonetic
-phrase, phraseExplain
-sync_process
-
-username, password, loginTest
-appID, appKey, apiTest,fromPublicAPI
-"""
 
 
 class Window(QWidget):
@@ -108,11 +79,10 @@ class Window(QWidget):
         self.terms = []
         self.thread = None
         self.settings = None
-        # settings = self.retriveSettings()
-        uic.loadUi("../../addons/youdao.ui", self)  # load ui from *.ui file
-        self.setupUI(self)  # setupUI
+        # load ui from *.ui file
+        uic.loadUi("../../addons/youdao.ui", self)
+        self.setupUI(self)
         self.updateSettings(self)
-        # testMode()
         self.show()  # shows the window
 
     def setupUI(self, window):
@@ -123,75 +93,30 @@ class Window(QWidget):
         window.password.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != ""))
         window.deck.textEdited[str].connect(lambda: window.deck.setEnabled(window.deck.text() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
-        window.appID.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appID.text() != "" and window.appKey.text() != ""))
-        window.appKey.textEdited[str].connect(lambda: window.apiTest.setEnabled(window.appKey.text() != "" and window.appID.text() != ""))
-        window.fromYoudaoDict.toggled.connect(lambda: window.cloudAPI.setEnabled((window.fromPublicAPI.isChecked() is False)))
-        window.fromYoudaoDict.toggled.connect(lambda: window.apiStatus.setText("Press buttom to test API validation"))
-        window.fromYoudaoDict.toggled.connect(lambda: window.phraseExplain.setEnabled(window.phrase.isChecked()))
-        window.fromWordbook.toggled.connect(lambda: window.apiStatus.setText("Select 'From Youdao' radioButtom first"))
         window.sync.clicked.connect(self.clickSync)
-        window.reset.clicked.connect(self.clickRest)
         window.loginTest.clicked.connect(self.clickLoginTest)
-        window.apiTest.clicked.connect(self.clikAPITest)
         window.tabWidget.setCurrentIndex(0)
         window.setWindowTitle("Sync with Youdao wordbook")
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
         if (settings):
-            window.deck.setText(settings[2])
             window.username.setText(settings[0])
             window.password.setText(settings[1])
-            window.fromWordbook.setChecked(settings[3])
-            if settings[4]:
-                window.apiStatus.setText("Press buttom to check API validation!")
-                window.fromYoudaoDict.setChecked(True)
-                window.fromPublicAPI.setEnabled(True)
-                if settings[11]:
-                    window.fromPublicAPI.setChecked(True)
-                    window.cloudAPI.setEnabled(False)
-            else:
-                window.apiStatus.setText("Select 'From Youdao' radioButtom first")
-                window.fromYoudaoDict.setChecked(False)
-            window.fromPublicAPI.setEnabled(settings[4])
-            window.us_phonetic.setChecked(settings[5])
-            window.uk_phonetic.setChecked(settings[6])
-            window.phrase.setChecked(settings[7])
-            window.phraseExplain.setChecked(settings[8])
-            window.phraseExplain.setEnabled(not settings[3])
-
-            window.appID.setText(settings[9])
-            window.appKey.setText(settings[10])
+            window.deck.setText(settings[2])
+            window.uk_phonetic.setChecked(settings[3])
+            window.us_phonetic.setChecked(settings[4])
+            window.phrase.setChecked(settings[5])
+            window.phraseExplain.setChecked(settings[6] and settings[5])
         else:
             window.deck.setText("Youdao")
 
         window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != "")
-        window.apiTest.setEnabled(window.appID.text() != "" and window.appKey.text() != "")
         window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != "" and window.deck.text() != "")
 
-        # go to login tab first if no username and password provided
+        # switch ti login tab first if no username or password is provided
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
-
-    def clickRest(self):
-        cardID = []
-        for iterm in self.terms:
-            cardsToDelete = []
-            deckID = mw.col.decks.id('Youdao')
-            cardID.append(mw.col.findCards("term:" + iterm))
-            for iterm in cardID:
-                for cid in iterm:
-                    query = "select id from cards where did = " + \
-                        str(deckID) + " and id= " + str(cid)
-                    r = mw.col.db.list(query)
-                    if r:
-                        cardsToDelete.append(r[0])
-
-        for iterm in cardsToDelete:
-            mw.col.db.execute("delete from cards where id = ?", iterm)
-            mw.col.db.execute("delete from notes where id = ?", iterm)
-        mw.col.fixIntegrity()
-        mw.reset()
 
     def clickSync(self):
         self.testOption = "no"
@@ -203,11 +128,12 @@ class Window(QWidget):
         elif settings[2] == '':
             showInfo('\n\nPlease enter Deckname!')
         elif askUser('Sync Now?'):
-            self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6], settings[7], settings[8], settings[9], settings[10], settings[11])
-            # [0username, 1password, 2deckname, 3fromWordbook, 4fromYoudaoDict, 5us, 6uk, 7phrase, 8phraseExplain, 9appID, 10appKey,11fromPublicAPI]
+            # [0username, 1password, 2deckname, 3uk, 4us, 5phrase, 6phraseExplain]
+            self.saveSettings(settings[0], settings[1], settings[2], settings[3], settings[4], settings[5], settings[6])
+
             self.tabWidget.setEnabled(False)
             self.sync.setText("Wait")
-            # self.progressLabel.setText("Fetching Words")
+
             # stop the previous thread first
             if self.thread is not None:
                 self.thread.terminate()
@@ -220,17 +146,11 @@ class Window(QWidget):
 
             # error with fetching data
             if self.thread.error:
-                self.debug.appendPlainText("Something went wrong")
+                showInfo("Something went wrong")
             else:
                 result = json.loads(self.thread.results)
-                # save terms prepare to reset
-                for value in result['terms']:
-                    self.terms.append(value['term'])
                 # save data to Anki Card
                 self.syncYoudao(result, settings[2])
-
-                # got finally data from here
-                self.debug.appendPlainText(self.thread.results)
 
             self.thread.terminate()
             self.thread = None
@@ -239,10 +159,8 @@ class Window(QWidget):
         deleted = result['deleted']
         terms = result['terms']
         cardID = []
-        info_add = '0'
-        info_delete = '0'
 
-        if terms[0] is not None:
+        if terms:
             deck = mw.col.decks.get(mw.col.decks.id(name))
             model = addCustomModel(name, mw.col)
 
@@ -255,16 +173,19 @@ class Window(QWidget):
             mw.col.models.setCurrent(model)
             mw.col.models.current()["did"] = deck["id"]
             mw.col.models.save(model)
-
             for term in terms:
                 note = mw.col.newNote()
                 note['term'] = term['term']
-                note['definition'] = term['definition']
+                if term['definition']:
+                    note['definition'] = term['definition']
+                else:
+                    note['definition'] = 'No definition'
                 if 'uk_phonetic' in term.keys():
                     note['uk_phonetic'] = term['uk_phonetic']
                 if 'us_phonetic' in term.keys():
                     note['us_phonetic'] = term['us_phonetic']
-                # # need to fill phrase field
+
+                # fill phrase field
                 if ('phrase' in term.keys()) and term['phrase']['phrase_terms']:
                     Nphrases = len(term['phrase']['phrase_terms'])
                     if ('phrase_terms' in term['phrase']) and ('phrase_explains' in term['phrase']):
@@ -275,74 +196,48 @@ class Window(QWidget):
                         for i in range((Nphrases < 3 and Nphrases or 3)):
                             note['phrase' + str(i)] = term['phrase']['phrase_terms'][i]
                 mw.col.addNote(note)
-                mw.col.reset()
-                mw.reset()
+            mw.col.reset()
+            mw.reset()
 
-        if deleted[0] is not None:
+        # delete cards
+        if deleted:
             for term in deleted:
                 cardID = mw.col.findCards("term:" + term)
                 deckID = mw.col.decks.id(name)
-            for cid in cardID:
-                nid = mw.col.db.scalar("select nid from cards where id = ? and did = ?", cid, deckID)
-                if nid is not None:
-                    mw.col.db.execute("delete from cards where id =?", cid)
-                    mw.col.db.execute("delete from notes where id =?", nid)
-                mw.col.fixIntegrity()
-                mw.col.reset()
-                mw.reset()
-            # info_delete = str(len(deleted))
-        # showInfo('\nAdded : ' + info_add + '\n\nDeleted : ' + info_delete)
+                for cid in cardID:
+                    nid = mw.col.db.scalar("select nid from cards where id = ? and did = ?", cid, deckID)
+                    if nid is not None:
+                        mw.col.db.execute("delete from cards where id =?", cid)
+                        mw.col.db.execute("delete from notes where id =?", nid)
+
+            mw.col.fixIntegrity()
+            mw.col.reset()
+            mw.reset()
+
+        showInfo('\nAdded : ' + str(len(terms)) + '\n\nDeleted : ' + str(len(deleted)))
 
     def clickLoginTest(self):
         self.testOption = "login"
         self.loginTest.setEnabled(False)
         self.loginTest.setText("Checking..")
+        if self.thread is not None:
+            self.thread.terminate()
 
-        try:
-            if self.thread is not None:
-                self.thread.terminate()
+        self.thread = YoudaoDownloader(self)
+        self.thread.start()
+        while not self.thread.isFinished():
+            mw.app.processEvents()
+            self.thread.wait(50)
 
-            self.thread = YoudaoDownloader(self)
-            self.thread.start()
-            while not self.thread.isFinished():
-                mw.app.processEvents()
-                self.thread.wait(50)
-
-        except Exception as e:
-            showInfo(str(e))
-
-    def clikAPITest(self):
-        self.testOption = "API"
-        errorCode = {
-            0: "API Successfully!",
-            108: "Application ID or Application Key invalid!",
-            101: "The Application does not have a binding instance!"
-        }
-
-        try:
-            if self.thread is not None:
-                self.thread.terminate()
-
-            self.thread = YoudaoDownloader(self)
-            self.thread.start()
-            while not self.thread.isFinished():
-                mw.app.processEvents()
-                self.thread.wait(50)
-        except Exception as e:
-            showInfo(str(e))
-        # e = testPart.APItest(self.appID.text(), self.appKey.text())
-        ec = self.thread.errorCode
-        self.apiStatus.setText(errorCode.get(int(ec), "Faild with errorCode: {}".format(str(ec))))
-
-    def saveSettings(self, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI):
+    def saveSettings(self, username, password, deckname, uk, us, phrase, phraseExplain):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT, fromPublicAPI INTEGER)')
-        cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,fromWordbook,fromYoudaoDict,us,uk,phrase,phraseExplain,appID,appKey,fromPublicAPI) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (1, username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI))
-        cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,fromWordbook=?,fromYoudaoDict=?,us=?,uk=?,phrase=?,phraseExplain=?,appID=?,appKey=?,fromPublicAPI=? WHERE id=1',
-                       (username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI))
+            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,uk INTEGER,us INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT, fromPublicAPI INTEGER)')
+        cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,uk,us,phrase,phraseExplain) VALUES(?,?,?,?,?,?,?,?)',
+                       (1, username, password, deckname, uk, us, phrase, phraseExplain))
+        cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,uk=?,us=?,phrase=?,phraseExplain=? WHERE id=1',
+                       (username, password, deckname, uk, us, phrase, phraseExplain))
         cursor.rowcount
         conn.commit()
         conn.close()
@@ -351,47 +246,36 @@ class Window(QWidget):
         username = window.username.text()
         password = window.password.text()
         deckname = window.deck.text()
-        fromWordbook = window.fromWordbook.isChecked() and 1 or 0
-        fromYoudaoDict = window.fromYoudaoDict.isChecked() and 1 or 0
-        us = window.us_phonetic.isChecked() and 2 or 0
         uk = window.uk_phonetic.isChecked() and 1 or 0
+        us = window.us_phonetic.isChecked() and 2 or 0
         phrase = window.phrase.isChecked() and 4 or 0
         phraseExplain = window.phraseExplain.isChecked() and 8 or 0
-        appID = window.appID.text()
-        appKey = window.appKey.text()
-        fromPublicAPI = window.fromPublicAPI.isChecked() and 1 or 0
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
+        return [username, password, deckname, uk, us, phrase, phraseExplain]
 
     def getSettingsFromDatabase(self):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,us INTEGER,uk INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT,fromPublicAPI INTEGER)')
+        cursor.execute('create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,uk INTEGER,us INTEGER,phrase INTEGER,phraseExplain INTEGER)')
         cursor.execute('select * from settings')
         values = cursor.fetchall()
         if values:
             username = values[0][1]
             password = values[0][2]
             deckname = values[0][3]
-            fromWordbook = ((values[0][4] == 1) and True or False)
-            fromYoudaoDict = ((values[0][5] == 1) and True or False)
-            us = ((values[0][6] == 2) and True or False)
-            uk = ((values[0][7] == 1) and True or False)
-            phrase = ((values[0][8] == 4) and True or False)
-            phraseExplain = ((values[0][9] == 8) and True or False)
-            appID = values[0][10]
-            appKey = values[0][11]
-            fromPublicAPI = ((values[0][12] == 1) and True or False)
+            uk = ((values[0][4] == 1) and True or False)
+            us = ((values[0][5] == 2) and True or False)
+            phrase = ((values[0][6] == 4) and True or False)
+            phraseExplain = ((values[0][7] == 8) and True or False)
         else:
             return False
         cursor.rowcount
         conn.commit()
         conn.close()
-        return [username, password, deckname, fromWordbook, fromYoudaoDict, us, uk, phrase, phraseExplain, appID, appKey, fromPublicAPI]
+        return [username, password, deckname, uk, us, phrase, phraseExplain]
 
 
 class YoudaoDownloader(QThread):
-    """thread that downloads results from the Youdao-wordlist website"""
+    """thread that downloads results from the YoudaoWordBook"""
 
     def __init__(self, window):
         super(YoudaoDownloader, self).__init__()
@@ -410,11 +294,7 @@ class YoudaoDownloader(QThread):
             self.window.loginTest.setText("Check")
             self.window.loginTest.setEnabled(True)
 
-        # test API
-        elif self.window.testOption == "API":
-            self.errorCode = self.APITest(self.window.appID.text(), self.window.appKey.text())
-
-        # grab data from wordbook
+        # grab words from wordbook
         else:
             self.window.progressLabel.setText("Fetching Words")
             # get youdao wordlist
@@ -422,26 +302,21 @@ class YoudaoDownloader(QThread):
             if not self.login(self.window.username.text(), self.window.password.text()):
                 self.window.tabWidget.setCurrentIndex(1)
                 self.window.loginStatus.setText('Login Failed, Please check your account!!')
-                self.window.username.clear()
-                self.window.password.clear()
             else:
                 totalPage = self.totalPage()
                 self.window.progress.setMaximum(totalPage)
                 self.window.progress.setValue(0)
                 self.window.progressLabel.show()
-                for index in range(0, totalPage):
+                for index in range(totalPage):
                     self.window.progress.setValue(index + 1)
                     # trigger progressBar everysingle time
                     parser.feed(self.crawler(index))
-
                 previous = parser.retrivePrevious()
                 if previous:
                     self.results = json.dumps(parser.compare(previous))
                     self.window.progress.setValue(0)
-
                 else:
-                    self.results = json.dumps(parser.nocompare(), indent=4)
-
+                    self.results = json.dumps(parser.noCompare(), indent=4)
                 # if no results, there was an error
                 if self.results is None:
                     self.error = True
@@ -474,25 +349,6 @@ class YoudaoDownloader(QThread):
         else:
             return True
 
-    def APITest(self, appID, appKey):
-        q = "test"
-        salt = str(int(time.time()))
-        s = hashlib.md5()
-        s.update(appID + q + salt + appKey)
-        sign = s.hexdigest()
-        params = urllib.urlencode({
-            'q': q,
-            'from': "EN",
-            'to': "zh-CHS",
-            'sign': sign,
-            'salt': salt,
-            'appKey': appID
-        })
-
-        f = urllib2.urlopen('http://openapi.youdao.com/api?' + params)
-        json_result = json.loads(f.read())
-        return json_result['errorCode']
-
     def crawler(self, pageIndex):
         response = self.opener.open(
             "http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
@@ -514,7 +370,6 @@ class parseWordbook(HTMLParser, object):
         HTMLParser.__init__(self)
         self.window = window
         self.terms = []
-        self.definitions = []
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute(
@@ -528,62 +383,62 @@ class parseWordbook(HTMLParser, object):
         # retrive the terms
         if tag == 'div':
             for attribute, value in attrs:
-                if value == 'word':
+                if attribute == 'class' and value == 'word':
                     self.terms.append(attrs[1][1])
-        # retrive the definitions
-                if value == 'desc':
-                    if attrs[1][1]:
-                        self.definitions.append(attrs[1][1])
-                    else:
-                        self.definitions.append(None)
 
-    def nocompare(self):
+    def noCompare(self):
         data = {'deleted': [], 'terms': []}
+        for term in self.terms:
+            data['terms'].append({'term': term, 'definition': "", "phrase": {'phrase_terms': [], 'phrase_explains': []}})
 
-        for index, value in enumerate(self.terms):
-            data['terms'].append({'term': value, 'definition': self.definitions[index], "phrase": {'phrase_terms': [], 'phrase_explains': []}})
+        # All the phrase option posibilities
+        '''None:0    K:1    S:2    KS:3    R:4    KR:5    SR:6    KSR:7    E:8    KE:9    SE:10    RE:12    KRE:13    SRE:14    KSRE:15'''
 
-        self.savePreviews(self.terms)
-
-        # the phrase option posibilities
-        '''
-        K:1	    KS:3    KR:5	KE:8    KSR:7   KRE:12  KSRE:14
-        S:2	    SR:6    SE:9    SRE:13
-        R:4	    RE:11
-        E:7
-        '''
         self.window.progress.setMaximum(len(data['terms']))
         self.window.progressLabel.setText("Fetching Details")
-        # wordbook only
-        if self.window.settings[3] == 1:
-            self.window.progress.setValue(0)
-            self.window.debug.appendPlainText(json.dumps(data))
-            return data
-        # get more from API
-        elif self.window.settings[4] == 1:
-            self.window.progress.setValue(0)
-            # fromPublicAPI self.window.settings[5:9]
-            if self.window.settings[11] == 1:
-                for index, value in enumerate(data['terms']):
-                    search = API.publicAPI(value['term'], self.window)
-                    value["uk_phonetic"] = search["uk_phonetic"]
-                    value["us_phonetic"] = search["us_phonetic"]
-                    value["definition"] = search["definition"]
-                    value['phrase']["phrase_terms"] = search["phrases"]
-                    value['phrase']["phrase_explains"] = search["phrase_explains"]
 
-            # fromPrivateAPI self.window.settings[5:11]
-            else:
-                api = API(self.window.appID.text(), self.window.appKey.text(), self.window)
-                for index, value in enumerate(data['terms']):
-                    search = api.request(value['term'])
-                    value["uk_phonetic"] = search["uk_phonetic"]
-                    value["us_phonetic"] = search["us_phonetic"]
-                    value["definition"] = search["definition"]
-                    value['phrase']["phrase_terms"] = search["phrases"]
-                    value['phrase']["phrase_explains"] = search["phrase_explains"]
-            # return self.processData(data, self.window.settings[5:9])
-            return self.processData(data, self.window.settings[5:9])
+        # get detials from API
+        self.window.progress.setValue(0)
+        for value in data['terms']:
+            search = API.publicAPI(value['term'], self.window)
+            value["uk_phonetic"] = search["uk_phonetic"]
+            value["us_phonetic"] = search["us_phonetic"]
+            value["definition"] = search["definition"]
+            value['phrase']["phrase_terms"] = search["phrases"]
+            value['phrase']["phrase_explains"] = search["phrase_explains"]
+
+        self.savePreviews(self.terms)
+        return self.processData(data, self.window.settings[3:])
+
+    def compare(self, previous):
+        data = {'deleted': [], 'terms': []}
+        addedTerms = []
+        for iterm in previous:
+            if iterm not in self.terms:
+                data['deleted'].append(iterm)
+
+        for i, iterm in enumerate(self.terms):
+            if iterm not in previous:
+                addedTerms.append(iterm)
+
+        for value in addedTerms:
+            data['terms'].append({'term': value, 'definition': "", "phrase": {'phrase_terms': [], 'phrase_explains': []}})
+
+        if len(addedTerms) > 0:
+            self.window.progress.setMaximum(len(addedTerms))
+
+        self.window.progressLabel.setText("Fetching Details")
+        self.window.progress.setValue(0)
+        for index, value in enumerate(data['terms']):
+            search = API.publicAPI(value['term'], self.window)
+            value["uk_phonetic"] = search["uk_phonetic"]
+            value["us_phonetic"] = search["us_phonetic"]
+            value["definition"] = search["definition"]
+            value['phrase']["phrase_terms"] = search["phrases"]
+            value['phrase']["phrase_explains"] = search["phrase_explains"]
+
+        self.savePreviews(self.terms)
+        return self.processData(data, self.window.settings[3:])
 
     def processData(self, results, args):
         option = sum(args)
@@ -637,10 +492,8 @@ class parseWordbook(HTMLParser, object):
     def savePreviews(self, terms):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute(
-            'create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20))')
-        cursor.execute('insert into history (terms,time) values (?,?)',
-                       (pickle.dumps(terms), time.strftime("%Y-%m-%d")))
+        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20))')
+        cursor.execute('insert OR IGNORE into history (terms,time) values (?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S")))
         cursor.rowcount
         cursor.close()
         conn.commit()
@@ -651,80 +504,18 @@ class parseWordbook(HTMLParser, object):
         cursor = conn.cursor()
         cursor.execute('select * from history order by id desc limit 0, 1')
         values = cursor.fetchall()
-        # values[number of raw][0->id,1->terms,2->definitions,3->time]
-        if values:
-            terms = pickle.loads(values[0][1])
-            # definitions = pickle.loads(values[0][2])
-        else:
-            return False
         cursor.close()
         conn.close()
+        # values[number of raw][0->id,1->terms,2->time]
+        if values:
+            terms = pickle.loads(values[0][1])
+        else:
+            return False
+
         return terms
 
 
 class API(object):
-    def __init__(self, appID, appKey, window):
-        self.url = 'http://fanyi.youdao.com/openapi.do'
-        self.appKey = appKey
-        self.appID = appID
-        self._from = "EN"
-        self.to = "zh-CHS"
-        self.window = window
-
-    def request(self, q):
-        self.q = q
-        self.salt = str(int(time.time()))
-        s = hashlib.md5()
-        s.update(self.appID + self.q + self.salt + self.appKey)
-        self.sign = s.hexdigest()
-        params = urllib.urlencode({
-            'q': self.q,
-            'from': self._from,
-            'to': self.to,
-            'sign': self.sign,
-            'salt': self.salt,
-            'appKey': self.appID
-        })
-
-        f = urllib2.urlopen('http://openapi.youdao.com/api?' + params)
-        json_result = json.loads(f.read())
-        try:
-            explains = ",".join(json_result["basic"]["explains"])
-        except:
-            try:
-                explains = ",".join(json_result["web"][0]["value"])
-            except:
-                explains = "No definition"
-
-        try:
-            uk_phonetic = json_result["basic"]["uk-phonetic"]
-        except:
-            uk_phonetic = "No UK Phonetic"
-        try:
-            us_phonetic = json_result["basic"]["us-phonetic"]
-        except:
-            us_phonetic = "No US Phonetic"
-
-        try:
-            phrases = []
-            phrase_explains = []
-            json_phrase = json_result["web"]
-            nphrases = len(json_phrase)
-            for i in range(1, nphrases):
-                phrases.append(json_phrase[i]['key'])
-                phrase_explains.append(",".join(json_phrase[i]['value']))
-        except:
-            phrases = "No Phrase"
-            phrase_explains = "No Phrase"
-
-        # indicate api progress
-        self.window.progress.setValue(self.window.progress.value() + 1)
-        return {"uk_phonetic": uk_phonetic,
-                "us_phonetic": us_phonetic,
-                "definition": explains,
-                "phrases": phrases,
-                "phrase_explains": phrase_explains
-                }
 
     @classmethod
     def publicAPI(self, q, window):
