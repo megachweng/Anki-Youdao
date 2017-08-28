@@ -85,6 +85,7 @@ class Window(QWidget):
         self.setupUI(self)
         self.updateSettings(self)
         self.show()  # shows the window
+        self.dwindow = False
 
     def setupUI(self, window):
         window.progressLabel.hide()
@@ -95,12 +96,20 @@ class Window(QWidget):
         window.deck.textEdited[str].connect(lambda: window.deck.setEnabled(window.deck.text() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.sync.clicked.connect(self.clickSync)
+        window.showDebug.clicked.connect(self.showDebugWindow)
         window.loginTest.clicked.connect(self.clickLoginTest)
         window.tabWidget.setCurrentIndex(0)
         window.setWindowTitle("Sync with Youdao wordbook")
         window.RestoreHistory.clicked.connect(self.clickRestoreHistory)
         window.deleteHistory.clicked.connect(self.clickDeleteHistory)
         self.setupHistoryList()
+
+    def showDebugWindow(self):
+        if self.dwindow:
+            self.resize(363, 298)
+        else:
+            self.resize(363, 500)
+        self.dwindow = not self.dwindow
 
     def setupHistoryList(self):
         conn = sqlite3.connect('youdao-anki.db')
