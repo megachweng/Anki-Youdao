@@ -11,6 +11,7 @@ import pickle
 import json
 import hashlib
 import time
+import copy
 reload(sys)
 sys.setdefaultencoding('utf-8')
 # Anki
@@ -167,6 +168,7 @@ class Window(QWidget):
             # download the data!
             self.thread = YoudaoDownloader(self)
             self.thread.start()
+            self.debug.appendPlainText('170')
             while not self.thread.isFinished():
                 mw.app.processEvents()
                 self.thread.wait(50)
@@ -176,6 +178,7 @@ class Window(QWidget):
                 showInfo("Something went wrong")
             else:
                 result = json.loads(self.thread.results)
+                self.debug.appendPlainText('180')
                 # save data to Anki Card
                 self.syncYoudao(result, settings[2])
 
@@ -310,14 +313,15 @@ class YoudaoDownloader(QThread):
         self.error = False
         self.results = None
         self.errorCode = 1000
+        self.loadedCookies = None
 
     def run(self):
         # test login
         if self.window.testOption == "login":
             if self.login(self.window.username.text(), self.window.password.text()):
-                self.window.loginStatus.setText("Login Successfully!")
+                self.window.debug.appendPlainText("Login Successfully!")
             else:
-                self.window.loginStatus.setText("Login Failed!")
+                self.window.debug.appendPlainText("Login Failed!")
             self.window.loginTest.setText("Check")
             self.window.loginTest.setEnabled(True)
 
@@ -353,43 +357,74 @@ class YoudaoDownloader(QThread):
             self.window.sync.setText('Sync')
             self.window.tabWidget.setEnabled(True)
 
-    def login(self, username, password):
-        password = hashlib.md5(password.encode('utf-8')).hexdigest()
+    def saveCookies(self, cookiejar):
+        MozillaCookieJar = cookielib.MozillaCookieJar()
+        for c in cookiejar:
+            args = dict(vars(c).items())
+            args['rest'] = args['_rest']
+            del args['_rest']
+            c = cookielib.Cookie(**args)
+            MozillaCookieJar.set_cookie(c)
+        MozillaCookieJar.save('youdaoCookies', ignore_discard=True)
 
-        url = "https://logindict.youdao.com/login/acc/login"
-        payload = "username=" + urllib.quote(username) + "&password=" + password + \
-            "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
-        headers = {
-            'Cache-Control': '"no-cache"',
-            'Referer': 'http://account.youdao.com/login?service=dict&back_url=http://dict.youdao.com/wordbook/wordlist%3Fkeyfrom%3Dlogin_from_dict2.index',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        url = url + '?' + payload
-        req = urllib2.Request(url, headers=headers)
-        cookie = cookielib.CookieJar()
-        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
-        self.req = urllib2.install_opener(self.opener)
-        response = urllib2.urlopen(req)
-        if "登录" in response.read():
-            return False
-        else:
+    def loadCookies(self):
+        MozillaCookieJar = cookielib.MozillaCookieJar()
+        MozillaCookieJar.load('youdaoCookies', ignore_discard=True)
+        return MozillaCookieJar
+
+    def login(self, username, password):
+        if self.totalPage():
+            self.window.debug.appendPlainText('cookie Successfully')
             return True
+        else:
+            self.window.debug.appendPlainText('process login!')
+            password = hashlib.md5(password.encode('utf-8')).hexdigest()
+            url = "https://logindict.youdao.com/login/acc/login"
+            payload = "username=" + urllib.quote(username) + "&password=" + password + \
+                "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
+            headers = {
+                'Cache-Control': '"no-cache"',
+                'Referer': 'http://account.youdao.com/login?service=dict&back_url=http://dict.youdao.com/wordbook/wordlist%3Fkeyfrom%3Dlogin_from_dict2.index',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+            url = url + '?' + payload
+            req = urllib2.Request(url, headers=headers)
+            cookie = cookielib.CookieJar()
+            self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
+            self.req = urllib2.install_opener(self.opener)
+            urllib2.urlopen(req)
+            if any(username in c.value for c in cookie):
+                self.saveCookies(cookie)
+                return True
+            else:
+                return False
 
     def crawler(self, pageIndex):
-        response = self.opener.open(
-            "http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
+        req = urllib2.Request("http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.loadedCookies))
+        urllib2.install_opener(opener)
+        response = urllib2.urlopen(req)
         return response.read()
 
     def totalPage(self):
-        # page index start from 0 end at max-1
-        response = self.opener.open("http://dict.youdao.com/wordbook/wordlist?p=0&tags=")
-        source = response.read()
         try:
-            return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>', source, re.M | re.I).group(1)) - 1
-        except Exception:
-            return 1
-            pass
+            self.loadedCookies = self.loadCookies()
+            # page index start from 0 end at max-1
+            req = urllib2.Request('http://dict.youdao.com/wordbook/wordlist?p=0&tags=')
+            opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.loadedCookies))
+            urllib2.install_opener(opener)
+            response = urllib2.urlopen(req)
+            source = response.read()
+            if '密码错误' in source:
+                return False
+            else:
+                try:
+                    return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>', source, re.M | re.I).group(1)) - 1
+                except Exception:
+                    return 1
+        except Exception as e:
+            self.window.debug.appendPlainText(str(e))
 
 
 class parseWordbook(HTMLParser, object):
