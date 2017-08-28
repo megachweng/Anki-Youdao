@@ -78,6 +78,7 @@ class Window(QWidget):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
         self.terms = []
+        self.termsFromDB = None
         self.thread = None
         self.settings = None
         # load ui from *.ui file
@@ -112,6 +113,7 @@ class Window(QWidget):
         self.dwindow = not self.dwindow
 
     def setupHistoryList(self):
+        self.history.clear()
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute('select * from history order by id desc')
@@ -123,17 +125,29 @@ class Window(QWidget):
             self.history.addItem(str(day[2]))
 
     def clickRestoreHistory(self):
+        self.Option = "restore"
         time = self.history.currentItem().text()
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM history WHERE time='%s'" % time)
         row = pickle.loads(cursor.fetchone()[1])
+        self.termsFromDB = row
         cursor.close()
         conn.close()
+        self.clickSync('restore')
         self.debug.appendPlainText(str(row))
 
     def clickDeleteHistory(self):
-        pass
+        if askUser('Are you sure you want to delete this record?'):
+            conn = sqlite3.connect('youdao-anki.db')
+            cursor = conn.cursor()
+            time = self.history.currentItem().text()
+            sql = "DELETE FROM history WHERE time='%s'" % time
+            cursor.execute(sql)
+            conn.commit()
+            conn.close()
+            self.setupHistoryList()
+            self.debug.appendPlainText('%s deleted' % time)
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
@@ -155,8 +169,11 @@ class Window(QWidget):
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
 
-    def clickSync(self):
-        self.testOption = "no"
+    def clickSync(self, sig=None):
+        if sig is None:
+            self.Option = "syncFromWordBook"
+        else:
+            self.Option = sig
         settings = self.getSettingsFromUI(self)
         self.settings = settings
         if settings[0] == '' or settings[1] == '':
@@ -190,7 +207,7 @@ class Window(QWidget):
                 self.debug.appendPlainText('180')
                 # save data to Anki Card
                 self.syncYoudao(result, settings[2])
-
+                self.setupHistoryList()
             self.thread.terminate()
             self.thread = None
 
@@ -256,7 +273,7 @@ class Window(QWidget):
         showInfo('\nAdded : ' + str(len(terms)) + '\n\nDeleted : ' + str(len(deleted)))
 
     def clickLoginTest(self):
-        self.testOption = "login"
+        self.Option = "login"
         self.loginTest.setEnabled(False)
         self.loginTest.setText("Checking..")
         if self.thread is not None:
@@ -326,7 +343,7 @@ class YoudaoDownloader(QThread):
 
     def run(self):
         # test login
-        if self.window.testOption == "login":
+        if self.window.Option == "login":
             if self.login(self.window.username.text(), self.window.password.text()):
                 self.window.debug.appendPlainText("Login Successfully!")
             else:
@@ -343,14 +360,15 @@ class YoudaoDownloader(QThread):
                 self.window.tabWidget.setCurrentIndex(1)
                 self.window.loginStatus.setText('Login Failed, Please check your account!!')
             else:
-                totalPage = self.totalPage()
-                self.window.progress.setMaximum(totalPage)
-                self.window.progress.setValue(0)
-                self.window.progressLabel.show()
-                for index in range(totalPage):
-                    self.window.progress.setValue(index + 1)
-                    # trigger progressBar everysingle time
-                    parser.feed(self.crawler(index))
+                if self.window.Option is not 'restore':
+                    totalPage = self.totalPage()
+                    self.window.progress.setMaximum(totalPage)
+                    self.window.progress.setValue(0)
+                    self.window.progressLabel.show()
+                    for index in range(totalPage):
+                        self.window.progress.setValue(index + 1)
+                        # trigger progressBar everysingle time
+                        parser.feed(self.crawler(index))
                 previous = parser.retrivePrevious()
                 if previous:
                     self.results = json.dumps(parser.compare(previous))
@@ -482,6 +500,8 @@ class parseWordbook(HTMLParser, object):
         return self.processData(data, self.window.settings[3:])
 
     def compare(self, previous):
+        if self.window.Option is 'restore':
+            self.terms = self.window.termsFromDB
         data = {'deleted': [], 'terms': []}
         addedTerms = []
         for iterm in previous:
