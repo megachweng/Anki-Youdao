@@ -81,6 +81,7 @@ def addCustomModel(name, col):
 class Window(QWidget):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
+        self.initDB()
         self.terms = []
         self.termsFromDB = None
         self.thread = None
@@ -92,13 +93,24 @@ class Window(QWidget):
         self.show()  # shows the window
         self.dwindow = False
 
+    def initDB(self):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time TEXT,mark TEXT,deckname TEXT)')
+        cursor.execute('create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT ,uk INTEGER,us INTEGER,phrase INTEGER,phraseExplain INTEGER)')
+        cursor.rowcount
+        cursor.close()
+        conn.commit()
+        conn.close()
+
     def setupUI(self, window):
         window.progressLabel.hide()
         window.setWindowTitle("Sync with Youdao Word-list")
         window.password.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
-        window.password.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != ""))
-        window.deck.textEdited[str].connect(lambda: window.deck.setEnabled(window.deck.text() != ""))
+        window.username.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != ""))
+        window.password.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != ""))
+        window.deckList.editTextChanged.connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.sync.clicked.connect(self.clickSync)
         window.showDebug.clicked.connect(self.showDebugWindow)
@@ -109,6 +121,23 @@ class Window(QWidget):
         window.deleteHistory.clicked.connect(self.clickDeleteHistory)
         self.setupHistoryList()
         self.setLastSync()
+        self.setAllDeck()
+        # self.pushButton.clicked.connect(self.clickAllDeck)
+        # window.deckList.editTextChanged.connect(self.clickAllDeck)
+
+    def setAllDeck(self):
+        t = self.deckList.currentText()
+        self.deckList.clear()
+        alldecks = mw.col.decks.allNames()
+        alldecks.remove('Default')
+        for deckname in alldecks:
+            self.deckList.addItem(deckname)
+        self.debug.appendPlainText(str(mw.col.decks.allNames()))
+        if t:
+            self.deckList.setEditText(t)
+
+    def clickAllDeck(self):
+        self.debug.appendPlainText(self.deckList.currentText())
 
     def showDebugWindow(self):
         if self.dwindow:
@@ -182,19 +211,20 @@ class Window(QWidget):
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
+        window.debug.appendPlainText(str(settings))
         if (settings):
             window.username.setText(settings[0])
             window.password.setText(settings[1])
-            window.deck.setText(settings[2])
+            # window.deckList.setText(settings[2])
             window.uk_phonetic.setChecked(settings[3])
             window.us_phonetic.setChecked(settings[4])
             window.phrase.setChecked(settings[5])
             window.phraseExplain.setChecked(settings[6] and settings[5])
         else:
-            window.deck.setText("Youdao")
+            window.deckList.addItem("Youdao")
 
         window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != "")
-        window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deck.text() != "" and window.deck.text() != "")
+        window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != "")
 
         # switch ti login tab first if no username or password is provided
         if self.username.text() == '' or self.password.text() == '':
@@ -300,7 +330,7 @@ class Window(QWidget):
             mw.col.fixIntegrity()
             mw.col.reset()
             mw.reset()
-
+        self.setAllDeck()
         showInfo('\nAdded : ' + str(len(terms)) + '\n\nDeleted : ' + str(len(deleted)))
 
     def clickLoginTest(self):
@@ -323,8 +353,6 @@ class Window(QWidget):
     def saveSettings(self, username, password, deckname, uk, us, phrase, phraseExplain):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute(
-            'create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,fromWordbook INTEGER,fromYoudaoDict INTEGER ,uk INTEGER,us INTEGER,phrase INTEGER,phraseExplain INTEGER, appID TEXT,appKey TEXT, fromPublicAPI INTEGER)')
         cursor.execute('INSERT OR IGNORE INTO settings (id,username,password,deckname,uk,us,phrase,phraseExplain) VALUES(?,?,?,?,?,?,?,?)',
                        (1, username, password, deckname, uk, us, phrase, phraseExplain))
         cursor.execute('UPDATE settings SET username=?,password=?,deckname=?,uk=?,us=?,phrase=?,phraseExplain=? WHERE id=1',
@@ -336,7 +364,7 @@ class Window(QWidget):
     def getSettingsFromUI(self, window):
         username = window.username.text()
         password = window.password.text()
-        deckname = window.deck.text()
+        deckname = window.deckList.currentText()
         uk = window.uk_phonetic.isChecked() and 1 or 0
         us = window.us_phonetic.isChecked() and 2 or 0
         phrase = window.phrase.isChecked() and 4 or 0
@@ -344,25 +372,27 @@ class Window(QWidget):
         return [username, password, deckname, uk, us, phrase, phraseExplain]
 
     def getSettingsFromDatabase(self):
-        conn = sqlite3.connect('youdao-anki.db')
-        cursor = conn.cursor()
-        cursor.execute('create table if not exists settings (id INTEGER primary key, username TEXT,password TEXT,deckname TEXT,uk INTEGER,us INTEGER,phrase INTEGER,phraseExplain INTEGER)')
-        cursor.execute('select * from settings')
-        values = cursor.fetchall()
-        if values:
-            username = values[0][1]
-            password = values[0][2]
-            deckname = values[0][3]
-            uk = ((values[0][4] == 1) and True or False)
-            us = ((values[0][5] == 2) and True or False)
-            phrase = ((values[0][6] == 4) and True or False)
-            phraseExplain = ((values[0][7] == 8) and True or False)
-        else:
+        try:
+            conn = sqlite3.connect('youdao-anki.db')
+            cursor = conn.cursor()
+            cursor.execute('select * from settings')
+            values = cursor.fetchall()
+            cursor.rowcount
+            conn.commit()
+            conn.close()
+            if values:
+                username = values[0][1]
+                password = values[0][2]
+                deckname = values[0][3]
+                uk = ((values[0][4] == 1) and True or False)
+                us = ((values[0][5] == 2) and True or False)
+                phrase = ((values[0][6] == 4) and True or False)
+                phraseExplain = ((values[0][7] == 8) and True or False)
+            else:
+                return False
+            return [username, password, deckname, uk, us, phrase, phraseExplain]
+        except:
             return False
-        cursor.rowcount
-        conn.commit()
-        conn.close()
-        return [username, password, deckname, uk, us, phrase, phraseExplain]
 
 
 class YoudaoDownloader(QThread):
@@ -404,7 +434,7 @@ class YoudaoDownloader(QThread):
                         self.window.progress.setValue(index + 1)
                         # trigger progressBar everysingle time
                         parser.feed(self.crawler(index))
-                previous = parser.retrivePrevious()
+                previous = parser.retrivePrevious(self.window.deckList.currentText())
                 if previous:
                     self.results = json.dumps(parser.compare(previous))
                     self.window.progress.setValue(0)
@@ -430,9 +460,12 @@ class YoudaoDownloader(QThread):
         MozillaCookieJar.save('youdaoCookies', ignore_discard=True)
 
     def loadCookies(self):
-        MozillaCookieJar = cookielib.MozillaCookieJar()
-        MozillaCookieJar.load('youdaoCookies', ignore_discard=True)
-        return MozillaCookieJar
+        try:
+            MozillaCookieJar = cookielib.MozillaCookieJar()
+            MozillaCookieJar.load('youdaoCookies', ignore_discard=True)
+            return MozillaCookieJar
+        except:
+            return False
 
     def login(self, username, password):
         if self.totalPage():
@@ -486,7 +519,7 @@ class YoudaoDownloader(QThread):
                 except Exception:
                     return 1
         except Exception as e:
-            self.window.debug.appendPlainText(str(e))
+            return False
 
 
 class parseWordbook(HTMLParser, object):
@@ -494,13 +527,6 @@ class parseWordbook(HTMLParser, object):
         HTMLParser.__init__(self)
         self.window = window
         self.terms = []
-        conn = sqlite3.connect('youdao-anki.db')
-        cursor = conn.cursor()
-        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20),mark TEXT)')
-        cursor.rowcount
-        cursor.close()
-        conn.commit()
-        conn.close()
 
     def handle_starttag(self, tag, attrs):
         # retrive the terms
@@ -530,7 +556,7 @@ class parseWordbook(HTMLParser, object):
             value['phrase']["phrase_terms"] = search["phrases"]
             value['phrase']["phrase_explains"] = search["phrase_explains"]
 
-        self.savePreviews(self.terms)
+        self.savePreviews(self.terms, self.window.settings[2])
         return self.processData(data, self.window.settings[3:])
 
     def compare(self, previous):
@@ -562,7 +588,7 @@ class parseWordbook(HTMLParser, object):
             value['phrase']["phrase_terms"] = search["phrases"]
             value['phrase']["phrase_explains"] = search["phrase_explains"]
 
-        self.savePreviews(self.terms)
+        self.savePreviews(self.terms, self.window.settings[2])
         return self.processData(data, self.window.settings[3:])
 
     def processData(self, results, args):
@@ -614,24 +640,23 @@ class parseWordbook(HTMLParser, object):
 
         return results
 
-    def savePreviews(self, terms):
+    def savePreviews(self, terms, deckname):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20), mark TEXT)')
         if self.window.Option == 'restore':
-            cursor.execute('insert OR IGNORE into history (terms,time,mark) values (?,?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S"), 'Restored'))
+            cursor.execute('insert OR IGNORE into history (terms,time,mark,deckname) values (?,?,?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S"), 'Restored', deckname))
         else:
-            cursor.execute('insert OR IGNORE into history (terms,time,mark) values (?,?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S"), 'N'))
+            cursor.execute('insert OR IGNORE into history (terms,time,mark,deckname) values (?,?,?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S"), 'N', deckname))
         cursor.rowcount
         cursor.close()
         conn.commit()
         conn.close()
         self.window.setLastSync()
 
-    def retrivePrevious(self):
+    def retrivePrevious(self, deckname):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute('select * from history order by id desc limit 0, 1')
+        cursor.execute("select * from history where deckname='%s'order by id desc limit 0, 1" % deckname)
         values = cursor.fetchall()
         cursor.close()
         conn.close()
