@@ -17,10 +17,14 @@ sys.setdefaultencoding('utf-8')
 # Anki
 from aqt import mw
 from aqt.qt import *
-from aqt.utils import showInfo, askUser
+from aqt.utils import showInfo, askUser, tooltip
 # PyQT
 from PyQt4 import QtGui, uic
 from PyQt4.QtGui import *
+try:
+    from PyQt4.QtCore import QString
+except ImportError:
+    QString = str
 __window = None
 
 
@@ -104,16 +108,31 @@ class Window(QWidget):
         window.RestoreHistory.clicked.connect(self.clickRestoreHistory)
         window.deleteHistory.clicked.connect(self.clickDeleteHistory)
         self.setupHistoryList()
+        self.setLastSync()
 
     def showDebugWindow(self):
         if self.dwindow:
-            self.resize(363, 298)
+            self.resize(363, 340)
         else:
             self.resize(363, 500)
         self.dwindow = not self.dwindow
 
+    def setLastSync(self):
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute('select * from history order by id desc limit 0, 1')
+        values = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        # values[number of raw][0->id,1->terms,2->time]
+        if values:
+            time = 'Last sync: ' + str(values[0][2])
+        else:
+            time = 'Last sync: None'
+        self.lastSync.setText(time)
+
     def setupHistoryList(self):
-        self.history.clear()
+        self.table.clear()
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute('select * from history order by id desc')
@@ -121,12 +140,21 @@ class Window(QWidget):
         cursor.close()
         conn.close()
         # values[number of raw][0->id,1->terms,2->time]
-        for day in values:
-            self.history.addItem(str(day[2]))
+        self.table.setColumnCount(2)
+        self.table.setRowCount(len(values))
+        self.table.setHorizontalHeaderLabels(QString("Mark;Time;").split(";"))
+        for index, day in enumerate(values):
+            self.table.setItem(index, 1, QTableWidgetItem(str(day[2])))
+            mark = day[3]
+            if mark is None:
+                mark = 'N'
+            self.table.setItem(index, 0, QTableWidgetItem(mark))
 
     def clickRestoreHistory(self):
         self.Option = "restore"
-        time = self.history.currentItem().text()
+        for index in self.table.selectedIndexes():
+            selected = index.row()
+            time = self.table.item(int(selected), 1).text()
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM history WHERE time='%s'" % time)
@@ -141,13 +169,16 @@ class Window(QWidget):
         if askUser('Are you sure you want to delete this record?'):
             conn = sqlite3.connect('youdao-anki.db')
             cursor = conn.cursor()
-            time = self.history.currentItem().text()
+            for index in self.table.selectedIndexes():
+                selected = index.row()
+                time = self.table.item(int(selected), 1).text()
             sql = "DELETE FROM history WHERE time='%s'" % time
             cursor.execute(sql)
             conn.commit()
             conn.close()
             self.setupHistoryList()
             self.debug.appendPlainText('%s deleted' % time)
+            self.setLastSync()
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
@@ -284,6 +315,10 @@ class Window(QWidget):
         while not self.thread.isFinished():
             mw.app.processEvents()
             self.thread.wait(50)
+        if self.thread.error:
+            showInfo('\n\nLogin test Failed!')
+        else:
+            showInfo('\n\nLogin test passed!')
 
     def saveSettings(self, username, password, deckname, uk, us, phrase, phraseExplain):
         conn = sqlite3.connect('youdao-anki.db')
@@ -461,8 +496,7 @@ class parseWordbook(HTMLParser, object):
         self.terms = []
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute(
-            'create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20))')
+        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20),mark TEXT)')
         cursor.rowcount
         cursor.close()
         conn.commit()
@@ -583,12 +617,16 @@ class parseWordbook(HTMLParser, object):
     def savePreviews(self, terms):
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20))')
-        cursor.execute('insert OR IGNORE into history (terms,time) values (?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S")))
+        cursor.execute('create table if not exists history (id INTEGER primary key, terms TEXT,time varchar(20), mark TEXT)')
+        if self.window.Option == 'restore':
+            cursor.execute('insert OR IGNORE into history (terms,time,mark) values (?,?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S"), 'Restored'))
+        else:
+            cursor.execute('insert OR IGNORE into history (terms,time,mark) values (?,?,?)', (pickle.dumps(terms), time.strftime("%Y-%m-%d %H:%M:%S"), 'N'))
         cursor.rowcount
         cursor.close()
         conn.commit()
         conn.close()
+        self.window.setLastSync()
 
     def retrivePrevious(self):
         conn = sqlite3.connect('youdao-anki.db')
@@ -600,10 +638,10 @@ class parseWordbook(HTMLParser, object):
         # values[number of raw][0->id,1->terms,2->time]
         if values:
             terms = pickle.loads(values[0][1])
+            return terms
+
         else:
             return False
-
-        return terms
 
 
 class API(object):
