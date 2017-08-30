@@ -5,13 +5,14 @@ import sys
 import urllib
 import urllib2
 import cookielib
+import os
 import re
 import sqlite3
 import pickle
 import json
 import hashlib
 import time
-import copy
+import traceback
 reload(sys)
 sys.setdefaultencoding('utf-8')
 # Anki
@@ -86,12 +87,15 @@ class Window(QWidget):
         self.termsFromDB = None
         self.thread = None
         self.settings = None
+        self.dwindow = False
         # load ui from *.ui file
         uic.loadUi("../../addons/YAsupportFiles/main.ui", self)
+
         self.setupUI(self)
         self.updateSettings(self)
+        self.setupHistoryList()
+
         self.show()  # shows the window
-        self.dwindow = False
 
     def initDB(self):
         conn = sqlite3.connect('youdao-anki.db')
@@ -110,6 +114,8 @@ class Window(QWidget):
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.username.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != ""))
         window.password.textEdited[str].connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != ""))
+        window.password.textEdited[str].connect(self.userInfoChanged)
+        window.username.textEdited[str].connect(self.userInfoChanged)
         window.deckList.editTextChanged.connect(lambda: window.sync.setEnabled(window.password.text() != "" and window.username.text() != "" and window.deckList.currentText() != ""))
         window.username.textEdited[str].connect(lambda: window.loginTest.setEnabled(window.password.text() != "" and window.username.text() != ""))
         window.sync.clicked.connect(self.clickSync)
@@ -118,12 +124,15 @@ class Window(QWidget):
         window.tabWidget.setCurrentIndex(0)
         window.setWindowTitle("Sync with Youdao wordbook")
         window.RestoreHistory.clicked.connect(self.clickRestoreHistory)
-        window.deleteHistory.clicked.connect(self.clickDeleteHistory)
-        self.setupHistoryList()
         self.setLastSync()
         self.setAllDeck()
-        # self.pushButton.clicked.connect(self.clickAllDeck)
-        # window.deckList.editTextChanged.connect(self.clickAllDeck)
+        self.deckList.currentIndexChanged.connect(self.setupHistoryList)
+        self.debug.appendPlainText('130: setupUI')
+
+    def userInfoChanged(self):
+        if os.path.exists('youdaoCookies'):
+            os.remove('youdaoCookies')
+            self.debug.appendPlainText('rm cookie because UserInfoChanged')
 
     def setAllDeck(self):
         t = self.deckList.currentText()
@@ -132,18 +141,17 @@ class Window(QWidget):
         alldecks.remove('Default')
         for deckname in alldecks:
             self.deckList.addItem(deckname)
-        self.debug.appendPlainText(str(mw.col.decks.allNames()))
         if t:
             self.deckList.setEditText(t)
-
-    def clickAllDeck(self):
-        self.debug.appendPlainText(self.deckList.currentText())
+        self.debug.appendPlainText('142: setAllDeck')
 
     def showDebugWindow(self):
         if self.dwindow:
             self.resize(363, 340)
+            self.debug.appendPlainText('147 hideDebugWindow')
         else:
             self.resize(363, 500)
+            self.debug.appendPlainText('150 showDebugWindow')
         self.dwindow = not self.dwindow
 
     def setLastSync(self):
@@ -155,16 +163,17 @@ class Window(QWidget):
         conn.close()
         # values[number of raw][0->id,1->terms,2->time]
         if values:
-            time = 'Last sync: ' + str(values[0][2])
+            time = 'Last sync: ' + str(values[0][2]) + " : " + str(values[0][4])
         else:
             time = 'Last sync: None'
         self.lastSync.setText(time)
+        self.debug.appendPlainText('167:get last sync time')
 
     def setupHistoryList(self):
         self.table.clear()
         conn = sqlite3.connect('youdao-anki.db')
         cursor = conn.cursor()
-        cursor.execute('select * from history order by id desc')
+        cursor.execute("select * from history where deckname='%s' order by id desc" % self.deckList.currentText())
         values = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -178,6 +187,7 @@ class Window(QWidget):
             if mark is None:
                 mark = 'N'
             self.table.setItem(index, 0, QTableWidgetItem(mark))
+        self.debug.appendPlainText('187: get sync history')
 
     def clickRestoreHistory(self):
         self.Option = "restore"
@@ -192,22 +202,7 @@ class Window(QWidget):
         cursor.close()
         conn.close()
         self.clickSync('restore')
-        self.debug.appendPlainText(str(row))
-
-    def clickDeleteHistory(self):
-        if askUser('Are you sure you want to delete this record?'):
-            conn = sqlite3.connect('youdao-anki.db')
-            cursor = conn.cursor()
-            for index in self.table.selectedIndexes():
-                selected = index.row()
-                time = self.table.item(int(selected), 1).text()
-            sql = "DELETE FROM history WHERE time='%s'" % time
-            cursor.execute(sql)
-            conn.commit()
-            conn.close()
-            self.setupHistoryList()
-            self.debug.appendPlainText('%s deleted' % time)
-            self.setLastSync()
+        self.debug.appendPlainText("202: clickRestoreHistory")
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
@@ -229,6 +224,7 @@ class Window(QWidget):
         # switch ti login tab first if no username or password is provided
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
+        self.debug.appendPlainText('update GUI settings')
 
     def clickSync(self, sig=None):
         if sig is None:
@@ -255,22 +251,25 @@ class Window(QWidget):
             # download the data!
             self.thread = YoudaoDownloader(self)
             self.thread.start()
-            self.debug.appendPlainText('170')
             while not self.thread.isFinished():
                 mw.app.processEvents()
                 self.thread.wait(50)
 
             # error with fetching data
-            if self.thread.error:
-                showInfo("Something went wrong")
+            if self.thread.error is 1:
+                showInfo("authenticate failed!")
+            elif self.thread.error is 2:
+                showInfo("Can not fetch data!")
             else:
                 result = json.loads(self.thread.results)
-                self.debug.appendPlainText('180')
+                self.debug.appendPlainText('277: loaded downloader results')
                 # save data to Anki Card
                 self.syncYoudao(result, settings[2])
                 self.setupHistoryList()
             self.thread.terminate()
             self.thread = None
+            self.sync.setText('Sync')
+            self.tabWidget.setEnabled(True)
 
     def syncYoudao(self, result, name):
         deleted = result['deleted']
@@ -336,7 +335,7 @@ class Window(QWidget):
     def clickLoginTest(self):
         self.Option = "login"
         self.loginTest.setEnabled(False)
-        self.loginTest.setText("Checking..")
+        self.loginTest.setText("Login..")
         if self.thread is not None:
             self.thread.terminate()
 
@@ -346,9 +345,9 @@ class Window(QWidget):
             mw.app.processEvents()
             self.thread.wait(50)
         if self.thread.error:
-            showInfo('\n\nLogin test Failed!')
+            showInfo('\n\nLogin Failed!')
         else:
-            showInfo('\n\nLogin test passed!')
+            showInfo('\n\nLogin passed!')
 
     def saveSettings(self, username, password, deckname, uk, us, phrase, phraseExplain):
         conn = sqlite3.connect('youdao-anki.db')
@@ -360,6 +359,7 @@ class Window(QWidget):
         cursor.rowcount
         conn.commit()
         conn.close()
+        self.debug.appendPlainText('374: saveSettings')
 
     def getSettingsFromUI(self, window):
         username = window.username.text()
@@ -370,28 +370,27 @@ class Window(QWidget):
         phrase = window.phrase.isChecked() and 4 or 0
         phraseExplain = window.phraseExplain.isChecked() and 8 or 0
         return [username, password, deckname, uk, us, phrase, phraseExplain]
+        self.debug.appendPlainText('385: getSettingsFromUI')
 
     def getSettingsFromDatabase(self):
-        try:
-            conn = sqlite3.connect('youdao-anki.db')
-            cursor = conn.cursor()
-            cursor.execute('select * from settings')
-            values = cursor.fetchall()
-            cursor.rowcount
-            conn.commit()
-            conn.close()
-            if values:
-                username = values[0][1]
-                password = values[0][2]
-                deckname = values[0][3]
-                uk = ((values[0][4] == 1) and True or False)
-                us = ((values[0][5] == 2) and True or False)
-                phrase = ((values[0][6] == 4) and True or False)
-                phraseExplain = ((values[0][7] == 8) and True or False)
-            else:
-                return False
+        conn = sqlite3.connect('youdao-anki.db')
+        cursor = conn.cursor()
+        cursor.execute('select * from settings')
+        values = cursor.fetchall()
+        cursor.rowcount
+        conn.commit()
+        conn.close()
+        if values:
+            username = values[0][1]
+            password = values[0][2]
+            deckname = values[0][3]
+            uk = ((values[0][4] == 1) and True or False)
+            us = ((values[0][5] == 2) and True or False)
+            phrase = ((values[0][6] == 4) and True or False)
+            phraseExplain = ((values[0][7] == 8) and True or False)
             return [username, password, deckname, uk, us, phrase, phraseExplain]
-        except:
+            self.debug.appendPlainText('404: getSettingsFromDatabase')
+        else:
             return False
 
 
@@ -403,51 +402,64 @@ class YoudaoDownloader(QThread):
         self.window = window
         self.error = False
         self.results = None
-        self.errorCode = 1000
         self.loadedCookies = None
 
     def run(self):
-        # test login
+        self.error = False
+        # login at the very fist time
         if self.window.Option == "login":
             if self.login(self.window.username.text(), self.window.password.text()):
-                self.window.debug.appendPlainText("Login Successfully!")
+                self.window.debug.appendPlainText("423: Login Successfully!")
+                self.window.loginTest.setText("Pass")
+                self.window.loginTest.setEnabled(False)
             else:
-                self.window.debug.appendPlainText("Login Failed!")
-            self.window.loginTest.setText("Check")
+                self.window.debug.appendPlainText('426: First Login failed!')
+
+            self.window.loginTest.setText("Login")
             self.window.loginTest.setEnabled(True)
 
         # grab words from wordbook
         else:
+            self.window.debug.appendPlainText("432: get words from wordbook!")
             self.window.progressLabel.setText("Fetching Words")
             # get youdao wordlist
             parser = parseWordbook(self.window)
-            if not self.login(self.window.username.text(), self.window.password.text()):
-                self.window.tabWidget.setCurrentIndex(1)
-                self.window.loginStatus.setText('Login Failed, Please check your account!!')
-            else:
-                if self.window.Option is not 'restore':
-                    totalPage = self.totalPage()
-                    self.window.progress.setMaximum(totalPage)
-                    self.window.progress.setValue(0)
-                    self.window.progressLabel.show()
-                    for index in range(totalPage):
-                        self.window.progress.setValue(index + 1)
-                        # trigger progressBar everysingle time
-                        parser.feed(self.crawler(index))
-                previous = parser.retrivePrevious(self.window.deckList.currentText())
-                if previous:
-                    self.results = json.dumps(parser.compare(previous))
-                    self.window.progress.setValue(0)
+            if not self.totalPage():
+                self.window.debug.appendPlainText("438: start rm cookie")
+                if os.path.exists('youdaoCookies'):
+                    os.remove("youdaoCookies")
+                    self.window.debug.appendPlainText("439:removed Cookie")
                 else:
-                    self.results = json.dumps(parser.noCompare(), indent=4)
-                # if no results, there was an error
-                if self.results is None:
-                    self.error = True
+                    self.window.debug.appendPlainText("443:rm cookie but not exists!")
+                if not self.login(self.window.username.text(), self.window.password.text()):
+                    self.window.tabWidget.setCurrentIndex(1)
+                    self.window.debug.appendPlainText("442:new loginFailed!")
+                    self.error = 1
+                    return
 
-                self.window.progressLabel.setText("Done")
+            self.window.debug.appendPlainText("445:use cookie!")
+            if self.window.Option is not 'restore':
+                self.window.debug.appendPlainText("447:restore Option!")
+                totalPage = self.totalPage()
+                self.window.progress.setMaximum(totalPage)
+                self.window.progress.setValue(0)
+                self.window.progressLabel.show()
+                for index in range(totalPage):
+                    self.window.progress.setValue(index + 1)
+                    # trigger progressBar everysingle time
+                    parser.feed(self.crawler(index))
+            previous = parser.retrivePrevious(self.window.deckList.currentText())
+            self.window.debug.appendPlainText("447:get previous!")
+            if previous:
+                self.results = json.dumps(parser.compare(previous))
+                self.window.progress.setValue(0)
+            else:
+                self.results = json.dumps(parser.noCompare(), indent=4)
+            # if no results, there was an error
+            if self.results is None:
+                self.error = 2
 
-            self.window.sync.setText('Sync')
-            self.window.tabWidget.setEnabled(True)
+            self.window.progressLabel.setText("Done")
 
     def saveCookies(self, cookiejar):
         MozillaCookieJar = cookielib.MozillaCookieJar()
@@ -460,40 +472,40 @@ class YoudaoDownloader(QThread):
         MozillaCookieJar.save('youdaoCookies', ignore_discard=True)
 
     def loadCookies(self):
-        try:
+        if os.path.exists('youdaoCookies'):
+            self.window.debug.appendPlainText('cookie exists!')
             MozillaCookieJar = cookielib.MozillaCookieJar()
             MozillaCookieJar.load('youdaoCookies', ignore_discard=True)
             return MozillaCookieJar
-        except:
+        else:
             return False
 
     def login(self, username, password):
-        if self.totalPage():
-            self.window.debug.appendPlainText('cookie Successfully')
+        self.window.debug.appendPlainText('process login!')
+        password = hashlib.md5(password.encode('utf-8')).hexdigest()
+        url = "https://logindict.youdao.com/login/acc/login"
+        payload = "username=" + urllib.quote(username) + "&password=" + password + \
+            "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
+        headers = {
+            'Cache-Control': '"no-cache"',
+            'Referer': 'http://account.youdao.com/login?service=dict&back_url=http://dict.youdao.com/wordbook/wordlist%3Fkeyfrom%3Dlogin_from_dict2.index',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        url = url + '?' + payload
+        req = urllib2.Request(url, headers=headers)
+        cookie = cookielib.CookieJar()
+        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
+        self.req = urllib2.install_opener(self.opener)
+        urllib2.urlopen(req)
+        if any(username in c.value for c in cookie):
+            self.saveCookies(cookie)
+            self.window.debug.appendPlainText('cookie saved')
             return True
         else:
-            self.window.debug.appendPlainText('process login!')
-            password = hashlib.md5(password.encode('utf-8')).hexdigest()
-            url = "https://logindict.youdao.com/login/acc/login"
-            payload = "username=" + urllib.quote(username) + "&password=" + password + \
-                "&savelogin=1&app=web&tp=urstoken&cf=7&fr=1&ru=http%3A%2F%2Fdict.youdao.com%2Fwordbook%2Fwordlist%3Fkeyfrom%3Dnull&product=DICT&type=1&um=true&savelogin=1"
-            headers = {
-                'Cache-Control': '"no-cache"',
-                'Referer': 'http://account.youdao.com/login?service=dict&back_url=http://dict.youdao.com/wordbook/wordlist%3Fkeyfrom%3Dlogin_from_dict2.index',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-            url = url + '?' + payload
-            req = urllib2.Request(url, headers=headers)
-            cookie = cookielib.CookieJar()
-            self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
-            self.req = urllib2.install_opener(self.opener)
-            urllib2.urlopen(req)
-            if any(username in c.value for c in cookie):
-                self.saveCookies(cookie)
-                return True
-            else:
-                return False
+            self.window.debug.appendPlainText('498 login failed')
+            self.error = 1
+            return False
 
     def crawler(self, pageIndex):
         req = urllib2.Request("http://dict.youdao.com/wordbook/wordlist?p=" + str(pageIndex) + "&tags=")
@@ -503,23 +515,23 @@ class YoudaoDownloader(QThread):
         return response.read()
 
     def totalPage(self):
-        try:
-            self.loadedCookies = self.loadCookies()
-            # page index start from 0 end at max-1
-            req = urllib2.Request('http://dict.youdao.com/wordbook/wordlist?p=0&tags=')
-            opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.loadedCookies))
-            urllib2.install_opener(opener)
-            response = urllib2.urlopen(req)
-            source = response.read()
-            if '密码错误' in source:
-                return False
-            else:
-                try:
-                    return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>', source, re.M | re.I).group(1)) - 1
-                except Exception:
-                    return 1
-        except Exception as e:
+
+        self.loadedCookies = self.loadCookies()
+        if not self.loadedCookies:
             return False
+        # page index start from 0 end at max-1
+        req = urllib2.Request('http://dict.youdao.com/wordbook/wordlist?p=0&tags=')
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.loadedCookies))
+        urllib2.install_opener(opener)
+        response = urllib2.urlopen(req)
+        source = response.read()
+        if '密码错误' in source:
+            return False
+        else:
+            try:
+                return int(re.search('<a href="wordlist.p=(.*).tags=" class="next-page">最后一页</a>', source, re.M | re.I).group(1)) - 1
+            except Exception:
+                return 1
 
 
 class parseWordbook(HTMLParser, object):
@@ -732,9 +744,13 @@ class API(object):
 
 
 def runYoudaoPlugin():
-    """menu item pressed; display search window"""
-    global __window
-    __window = Window()
+    try:
+        """menu item pressed; display window"""
+        global __window
+        __window = Window()
+    except Exception, e:
+        traceback.print_exc(file=open('error.log', 'w+'))
+
 
 
 # create menu item

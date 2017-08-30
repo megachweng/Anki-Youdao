@@ -41,7 +41,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="tab">
     <attribute name="title">
@@ -382,19 +382,6 @@
        <string>Restore</string>
       </property>
      </widget>
-     <widget class="QPushButton" name="deleteHistory">
-      <property name="geometry">
-       <rect>
-        <x>140</x>
-        <y>164</y>
-        <width>91</width>
-        <height>34</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Delete</string>
-      </property>
-     </widget>
      <widget class="QPushButton" name="showDebug">
       <property name="geometry">
        <rect>
@@ -405,7 +392,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>Debug</string>
+       <string>Log</string>
       </property>
      </widget>
      <widget class="QTableWidget" name="table">
