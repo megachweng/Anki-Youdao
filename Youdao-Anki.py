@@ -20,8 +20,9 @@ from aqt import mw
 from aqt.qt import *
 from aqt.utils import showInfo, askUser, tooltip
 # PyQT
-from PyQt4 import QtGui, uic
+from PyQt4 import QtGui,QtCore
 from PyQt4.QtGui import *
+
 try:
     from PyQt4.QtCore import QString
 except ImportError:
@@ -88,14 +89,162 @@ class Window(QWidget):
         self.thread = None
         self.settings = None
         self.dwindow = False
-        # load ui from *.ui file
-        uic.loadUi("../../addons/YAsupportFiles/main.ui", self)
-
+        self.initComponent()
         self.setupUI(self)
         self.updateSettings(self)
         self.setupHistoryList()
 
         self.show()  # shows the window
+
+    def initComponent(self):
+        self.resize(363, 340)
+        self.setMinimumSize(QtCore.QSize(363, 0))
+        self.setMaximumSize(QtCore.QSize(363, 500))
+        self.tabWidget = QTabWidget(self)
+        self.tabWidget.setGeometry(QtCore.QRect(8, 10, 347, 321))
+        self.tab = QWidget()
+        self.groupBox = QGroupBox(self.tab)
+        self.groupBox.setEnabled(True)
+        self.groupBox.setGeometry(QtCore.QRect(11, 85, 319, 121))
+        self.layoutWidget_2 = QWidget(self.groupBox)
+        self.layoutWidget_2.setGeometry(QtCore.QRect(10, 20, 301, 91))
+        self.gridLayout = QGridLayout(self.layoutWidget_2)
+        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout = QVBoxLayout()
+        self.us_phonetic = QCheckBox(self.layoutWidget_2)
+        self.us_phonetic.setEnabled(True)
+        self.us_phonetic.setCheckable(True)
+        self.us_phonetic.setChecked(True)
+        self.verticalLayout.addWidget(self.us_phonetic)
+        self.uk_phonetic = QCheckBox(self.layoutWidget_2)
+        self.uk_phonetic.setEnabled(True)
+        self.uk_phonetic.setCheckable(True)
+        self.uk_phonetic.setChecked(True)
+        self.verticalLayout.addWidget(self.uk_phonetic)
+        self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
+        self.verticalLayout_2 = QVBoxLayout()
+        self.phrase = QCheckBox(self.layoutWidget_2)
+        self.phrase.setEnabled(True)
+        self.phrase.setCheckable(True)
+        self.phrase.setChecked(True)
+        self.verticalLayout_2.addWidget(self.phrase)
+        self.phraseExplain = QCheckBox(self.layoutWidget_2)
+        self.phraseExplain.setEnabled(True)
+        self.phraseExplain.setCheckable(True)
+        self.phraseExplain.setChecked(True)
+        self.verticalLayout_2.addWidget(self.phraseExplain)
+        self.gridLayout.addLayout(self.verticalLayout_2, 0, 1, 1, 1)
+        self.groupBox_2 = QGroupBox(self.tab)
+        self.groupBox_2.setEnabled(True)
+        self.groupBox_2.setGeometry(QtCore.QRect(11, 1, 319, 81))
+        self.layoutWidget = QWidget(self.groupBox_2)
+        self.layoutWidget.setGeometry(QtCore.QRect(12, 34, 291, 34))
+        self.horizontalLayout = QHBoxLayout(self.layoutWidget)
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.label = QLabel(self.layoutWidget)
+        self.horizontalLayout.addWidget(self.label)
+        self.deckList = QComboBox(self.layoutWidget)
+        self.deckList.setEditable(True)
+        self.horizontalLayout.addWidget(self.deckList)
+        self.sync = QPushButton(self.layoutWidget)
+        self.sync.setEnabled(True)
+        self.horizontalLayout.addWidget(self.sync)
+        self.horizontalLayout.setStretch(1, 1)
+        self.layoutWidget1 = QWidget(self.tab)
+        self.layoutWidget1.setGeometry(QtCore.QRect(20, 260, 301, 31))
+        self.horizontalLayout_3 = QHBoxLayout(self.layoutWidget1)
+        self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
+        self.progress = QProgressBar(self.layoutWidget1)
+        self.progress.setProperty("value", 0)
+        self.progress.setTextVisible(False)
+        self.progress.setFormat("")
+        self.horizontalLayout_3.addWidget(self.progress)
+        self.progressLabel = QLabel(self.layoutWidget1)
+        self.horizontalLayout_3.addWidget(self.progressLabel)
+        self.lastSync = QLabel(self.tab)
+        self.lastSync.setGeometry(QtCore.QRect(20, 220, 301, 20))
+        self.lastSync.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.tabWidget.addTab(self.tab, "")
+        self.tab_2 = QWidget()
+        self.groupBox_3 = QGroupBox(self.tab_2)
+        self.groupBox_3.setGeometry(QtCore.QRect(10, -3, 321, 91))
+        self.username = QLineEdit(self.groupBox_3)
+        self.username.setGeometry(QtCore.QRect(84, 31, 138, 21))
+        sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.username.sizePolicy().hasHeightForWidth())
+        self.username.setSizePolicy(sizePolicy)
+        self.password = QLineEdit(self.groupBox_3)
+        self.password.setGeometry(QtCore.QRect(84, 62, 138, 21))
+        self.password.setInputMask("")
+        self.password.setMaxLength(32768)
+        self.password.setEchoMode(QLineEdit.Password)
+        self.label_4 = QLabel(self.groupBox_3)
+        self.label_4.setGeometry(QtCore.QRect(13, 62, 63, 16))
+        self.label_4.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.label_3 = QLabel(self.groupBox_3)
+        self.label_3.setGeometry(QtCore.QRect(10, 31, 66, 16))
+        self.label_3.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.loginTest = QPushButton(self.groupBox_3)
+        self.loginTest.setEnabled(False)
+        self.loginTest.setGeometry(QtCore.QRect(230, 27, 91, 64))
+        self.loginTest.setCheckable(False)
+        self.loginTest.setChecked(False)
+        self.groupBox_4 = QGroupBox(self.tab_2)
+        self.groupBox_4.setGeometry(QtCore.QRect(10, 86, 321, 201))
+        self.RestoreHistory = QPushButton(self.groupBox_4)
+        self.RestoreHistory.setGeometry(QtCore.QRect(230, 164, 91, 34))
+        self.showDebug = QPushButton(self.groupBox_4)
+        self.showDebug.setGeometry(QtCore.QRect(0, 164, 91, 34))
+        self.table = QTableWidget(self.groupBox_4)
+        self.table.setGeometry(QtCore.QRect(10, 30, 301, 131))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.table.setFont(font)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setAlternatingRowColors(False)
+        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setTextElideMode(QtCore.Qt.ElideLeft)
+        self.table.setShowGrid(False)
+        self.table.setWordWrap(False)
+        self.table.setCornerButtonEnabled(False)
+        self.table.setColumnCount(0)
+        self.table.setRowCount(0)
+        self.table.horizontalHeader().setMinimumSectionSize(8)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setHighlightSections(True)
+        self.table.verticalHeader().setStretchLastSection(False)
+        self.tabWidget.addTab(self.tab_2, "")
+        self.debug = QPlainTextEdit(self)
+        self.debug.setGeometry(QtCore.QRect(10, 340, 344, 151))
+        font = QtGui.QFont()
+        font.setPointSize(17)
+        self.debug.setFont(font)
+        self.debug.setStyleSheet("background: black;\n""color:yellow;")
+        self.debug.setReadOnly(True)
+        self.phrase.toggled['bool'].connect(self.phraseExplain.setEnabled)
+        self.groupBox.setTitle("Addition")
+        self.us_phonetic.setText("US phonetic")
+        self.uk_phonetic.setText("UK phonetic")
+        self.phrase.setText("Phrase")
+        self.phraseExplain.setText("Phrase explain")
+        self.groupBox_2.setTitle("Main")
+        self.label.setText("Deck")
+        self.sync.setText("Sync")
+        self.progressLabel.setText("Fecting Words")
+        self.lastSync.setText("Last Sync: None")
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), "Sync")
+        self.groupBox_3.setTitle("Login")
+        self.label_4.setText("Password:")
+        self.label_3.setText("Username:")
+        self.loginTest.setText("Check")
+        self.groupBox_4.setTitle("History")
+        self.RestoreHistory.setText("Restore")
+        self.showDebug.setText("Log")
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), "Login")
 
     def initDB(self):
         conn = sqlite3.connect('youdao-anki.db')
@@ -163,11 +312,11 @@ class Window(QWidget):
         conn.close()
         # values[number of raw][0->id,1->terms,2->time]
         if values:
-            time = 'Last sync: ' + str(values[0][2]) + " : " + str(values[0][4])
+            time = 'Last sync: ' + str(values[0][2]) + "(" + str(values[0][4]) + ")"
         else:
             time = 'Last sync: None'
         self.lastSync.setText(time)
-        self.debug.appendPlainText('167:get last sync time')
+        self.debug.appendPlainText('319: Get last sync time')
 
     def setupHistoryList(self):
         self.table.clear()
@@ -202,7 +351,7 @@ class Window(QWidget):
         cursor.close()
         conn.close()
         self.clickSync('restore')
-        self.debug.appendPlainText("202: clickRestoreHistory")
+        self.debug.appendPlainText("354: ClickRestoreHistory")
 
     def updateSettings(self, window):
         settings = self.getSettingsFromDatabase()
@@ -224,7 +373,7 @@ class Window(QWidget):
         # switch ti login tab first if no username or password is provided
         if self.username.text() == '' or self.password.text() == '':
             self.tabWidget.setCurrentIndex(1)
-        self.debug.appendPlainText('update GUI settings')
+        self.debug.appendPlainText('376: Update GUI settings')
 
     def clickSync(self, sig=None):
         if sig is None:
@@ -262,7 +411,7 @@ class Window(QWidget):
                 showInfo("Can not fetch data!")
             else:
                 result = json.loads(self.thread.results)
-                self.debug.appendPlainText('277: loaded downloader results')
+                self.debug.appendPlainText('414: Loaded downloader results')
                 # save data to Anki Card
                 self.syncYoudao(result, settings[2])
                 self.setupHistoryList()
@@ -359,7 +508,7 @@ class Window(QWidget):
         cursor.rowcount
         conn.commit()
         conn.close()
-        self.debug.appendPlainText('374: saveSettings')
+        self.debug.appendPlainText('511: SaveSettings')
 
     def getSettingsFromUI(self, window):
         username = window.username.text()
@@ -370,7 +519,7 @@ class Window(QWidget):
         phrase = window.phrase.isChecked() and 4 or 0
         phraseExplain = window.phraseExplain.isChecked() and 8 or 0
         return [username, password, deckname, uk, us, phrase, phraseExplain]
-        self.debug.appendPlainText('385: getSettingsFromUI')
+        self.debug.appendPlainText('522: GetSettingsFromUI')
 
     def getSettingsFromDatabase(self):
         conn = sqlite3.connect('youdao-anki.db')
@@ -389,7 +538,7 @@ class Window(QWidget):
             phrase = ((values[0][6] == 4) and True or False)
             phraseExplain = ((values[0][7] == 8) and True or False)
             return [username, password, deckname, uk, us, phrase, phraseExplain]
-            self.debug.appendPlainText('404: getSettingsFromDatabase')
+            self.debug.appendPlainText('541: GetSettingsFromDatabase')
         else:
             return False
 
@@ -409,37 +558,37 @@ class YoudaoDownloader(QThread):
         # login at the very fist time
         if self.window.Option == "login":
             if self.login(self.window.username.text(), self.window.password.text()):
-                self.window.debug.appendPlainText("423: Login Successfully!")
+                self.window.debug.appendPlainText("561: Login Successfully!")
                 self.window.loginTest.setText("Pass")
                 self.window.loginTest.setEnabled(False)
             else:
-                self.window.debug.appendPlainText('426: First Login failed!')
+                self.window.debug.appendPlainText('565: First Login failed!')
 
             self.window.loginTest.setText("Login")
             self.window.loginTest.setEnabled(True)
 
         # grab words from wordbook
         else:
-            self.window.debug.appendPlainText("432: get words from wordbook!")
+            self.window.debug.appendPlainText("572: get words from wordbook!")
             self.window.progressLabel.setText("Fetching Words")
             # get youdao wordlist
             parser = parseWordbook(self.window)
             if not self.totalPage():
-                self.window.debug.appendPlainText("438: start rm cookie")
+                self.window.debug.appendPlainText("577: Start rm cookie")
                 if os.path.exists('youdaoCookies'):
                     os.remove("youdaoCookies")
-                    self.window.debug.appendPlainText("439:removed Cookie")
+                    self.window.debug.appendPlainText("580: removed Cookie")
                 else:
-                    self.window.debug.appendPlainText("443:rm cookie but not exists!")
+                    self.window.debug.appendPlainText("582: Remove cookie but not exists!")
                 if not self.login(self.window.username.text(), self.window.password.text()):
                     self.window.tabWidget.setCurrentIndex(1)
-                    self.window.debug.appendPlainText("442:new loginFailed!")
+                    self.window.debug.appendPlainText("585: New loginFailed!")
                     self.error = 1
                     return
 
-            self.window.debug.appendPlainText("445:use cookie!")
+            self.window.debug.appendPlainText("589: Use cookie!")
             if self.window.Option is not 'restore':
-                self.window.debug.appendPlainText("447:restore Option!")
+                self.window.debug.appendPlainText("591: Option is Restore!")
                 totalPage = self.totalPage()
                 self.window.progress.setMaximum(totalPage)
                 self.window.progress.setValue(0)
@@ -449,7 +598,7 @@ class YoudaoDownloader(QThread):
                     # trigger progressBar everysingle time
                     parser.feed(self.crawler(index))
             previous = parser.retrivePrevious(self.window.deckList.currentText())
-            self.window.debug.appendPlainText("447:get previous!")
+            self.window.debug.appendPlainText("601: Get previous!")
             if previous:
                 self.results = json.dumps(parser.compare(previous))
                 self.window.progress.setValue(0)
@@ -473,7 +622,7 @@ class YoudaoDownloader(QThread):
 
     def loadCookies(self):
         if os.path.exists('youdaoCookies'):
-            self.window.debug.appendPlainText('cookie exists!')
+            self.window.debug.appendPlainText('625: Cookie exists!')
             MozillaCookieJar = cookielib.MozillaCookieJar()
             MozillaCookieJar.load('youdaoCookies', ignore_discard=True)
             return MozillaCookieJar
@@ -481,7 +630,7 @@ class YoudaoDownloader(QThread):
             return False
 
     def login(self, username, password):
-        self.window.debug.appendPlainText('process login!')
+        self.window.debug.appendPlainText('633: Process login!')
         password = hashlib.md5(password.encode('utf-8')).hexdigest()
         url = "https://logindict.youdao.com/login/acc/login"
         payload = "username=" + urllib.quote(username) + "&password=" + password + \
@@ -500,10 +649,10 @@ class YoudaoDownloader(QThread):
         urllib2.urlopen(req)
         if any(username in c.value for c in cookie):
             self.saveCookies(cookie)
-            self.window.debug.appendPlainText('cookie saved')
+            self.window.debug.appendPlainText('652: Cookie saved')
             return True
         else:
-            self.window.debug.appendPlainText('498 login failed')
+            self.window.debug.appendPlainText('655: Login failed')
             self.error = 1
             return False
 
