@@ -19,14 +19,18 @@ thanks to Anki, looking new word up in youdao dictionary, mark it then sync to A
 
 * Sync
 <div><img  style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/secondSync.gif"  width="600"  alt="linux"/></div>
+
 # How to install  
+
 #### From source code
 * Download adds-on zip file, unzip it
 * Move Youdao-wordlist to Anki add-ons folder
 * restart Anki.
+
 #### From Anki addons website
 * Type ```884820986``` in ```Anki```->```Tools```->```Add-ons```->```Browse and Install```->```Code```
 * Click ```Ok```  
+
 # To-Do
 * Utilize the ```saveSyncHistory``` method
 * Add a new tab,show the sync process history so users are able to restore
