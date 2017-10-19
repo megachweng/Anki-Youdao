@@ -1,4 +1,3 @@
-# Anki-Youdao
 >**只支持 Anki 2.0.x.** **Only supports Anki 2.0.x.**  
 
 **Anki-Youdao** 是一款方便[有道词典](http://cidian.youdao.com/multi.html)用户同云端单词本至[Anki](https://apps.ankiweb.net/#download)的插件  
@@ -12,7 +11,7 @@ You Can alse Check out this addon on [ Anki website.](https://ankiweb.net/shared
 If you are [Eudict](http://www.eudic.net/) user, please give **[Dict2Anki](https://github.com/megachweng/Dict2Anki)** a try(also support Youdao dictionary)
 
 
-# 特性 Features
+## 特性 Features
 - 支持Mac 和 Windows操作系统  
 Supports both Mac and Windows operating system
 
@@ -22,14 +21,14 @@ Word infomation is selectable
 - 回退同步历史  
 Can Rollback 
 
-# 界面 GUI
+## 界面 GUI
 <div>
 <span><img style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/mian.png" width="400" alt="Mac"/></span>
 <span><img  style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/login.png"  width="400"  alt="linux"/></span>
 <span ><img  style="padding:2px"
 </div>
 
-# 如何使用 How to use
+## 如何使用 How to use
 * 第一次同步 Sync very first time.
   <div><img  style="padding:2px" src="https://raw.githubusercontent.com/megachweng/Anki-Youdao/documentations/firstsync.gif"  width="600"  alt="linux"/></div>
 
