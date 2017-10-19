@@ -1,13 +1,15 @@
 # Anki-Youdao
+>**只支持 Anki 2.0.x.** **Only supports Anki 2.0.x.**  
 
 **Anki-Youdao** 是一款方便[有道词典](http://cidian.youdao.com/multi.html)用户同云端单词本至[Anki](https://apps.ankiweb.net/#download)的插件  
 **Anki-Youdao** is a Anki addon sync your [Youdao](http://cidian.youdao.com/multi.html) cloud wordbook to [Anki](https://apps.ankiweb.net/#download)
->**只支持 Anki 2.0.x.** **Only supports Anki 2.0.x.**  
+
 
 你也可以在[AnkiWeb](https://ankiweb.net/shared/info/884820986)上查看这个插件  
-You Can alse Check out this addon on [ Anki website.](https://ankiweb.net/shared/info/884820986)
-> 如果你使用[欧陆词典](http://www.eudic.net/)，也可以试试[Dict2Anki](https://github.com/megachweng/Dict2Anki)这款插件（同时支持有道词典  
-If you are [Eudict](http://www.eudic.net/) user, please give [Dict2Anki](https://github.com/megachweng/Dict2Anki) a try(also support Youdao dictionary)
+You Can alse Check out this addon on [ Anki website.](https://ankiweb.net/shared/info/884820986)  
+
+如果你使用[欧陆词典](http://www.eudic.net/)，也可以试试 **[Dict2Anki](https://github.com/megachweng/Dict2Anki)** 这款插件（同时支持有道词典)    
+If you are [Eudict](http://www.eudic.net/) user, please give **[Dict2Anki](https://github.com/megachweng/Dict2Anki)** a try(also support Youdao dictionary)
 
 
 # 特性 Features
