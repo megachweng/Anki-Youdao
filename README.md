@@ -1,5 +1,4 @@
-# Deprecated please use [Dict2Anki](https://github.com/megachweng/Dict2Anki) instead.
-# 已经停止维护，请使用新版 [Dict2Anki](https://github.com/megachweng/Dict2Anki)
+Deprecated please use [Dict2Anki](https://github.com/megachweng/Dict2Anki) instead.
 >**只支持 Anki 2.0.x.** **Only supports Anki 2.0.x.**  
 
 **Anki-Youdao** 是一款方便[有道词典](http://cidian.youdao.com/multi.html)用户同云端单词本至[Anki](https://apps.ankiweb.net/#download)的插件  
